@@ -120,6 +120,24 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(model.workspaces[3].name, "Third")
     }
 
+    func testCreateWorkspaceWithInitialItemsPersistsTree() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let link = Link(id: UUID(), title: "Arc Link", url: "https://arc.net", faviconPath: nil)
+        let folder = Folder(id: UUID(), name: "Arc Folder", children: [.link(link)], isExpanded: false)
+
+        let workspaceId = model.createWorkspace(name: "Arc Space", colorId: .ocean, items: [.folder(folder)])
+
+        XCTAssertEqual(model.currentWorkspace.id, workspaceId)
+        XCTAssertEqual(model.currentWorkspace.items, [.folder(folder)])
+
+        let reloaded = store.load()
+        XCTAssertEqual(reloaded.workspaces.count, 2)
+        XCTAssertEqual(reloaded.workspaces[1].items, [.folder(folder)])
+    }
+
     // MARK: - Pinned Links Tests
 
     func testPinLink() {

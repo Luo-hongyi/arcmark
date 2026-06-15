@@ -1006,22 +1006,8 @@ final class SettingsContentViewController: NSViewController {
     private func applyImport(_ result: ArcImportResult) {
         guard let appModel = appModel else { return }
 
-        // Remember the currently selected workspace
-        let previousWorkspaceId = appModel.state.selectedWorkspaceId
-
         for workspace in result.workspaces {
-            // Create the workspace using AppModel's method
-            _ = appModel.createWorkspace(name: workspace.name, colorId: workspace.colorId)
-
-            // The workspace is now selected, add all nodes to it
-            for node in workspace.nodes {
-                addNodeToWorkspace(node, parentId: nil, appModel: appModel)
-            }
-        }
-
-        // Restore the previously selected workspace
-        if let previousWorkspaceId = previousWorkspaceId {
-            appModel.selectWorkspace(id: previousWorkspaceId)
+            appModel.createWorkspace(name: workspace.name, colorId: workspace.colorId, items: workspace.nodes)
         }
 
         // Reload the workspace list to reflect the newly imported workspaces
@@ -1499,7 +1485,6 @@ extension SettingsContentViewController: NSCollectionViewDelegate, NSCollectionV
         workspaceDropIndicator.hide()
     }
 }
-
 
 
 

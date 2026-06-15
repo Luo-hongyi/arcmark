@@ -59,8 +59,8 @@ final class AppModel {
     }
 
     @discardableResult
-    func createWorkspace(name: String, colorId: WorkspaceColorId) -> UUID {
-        let workspace = Workspace(id: UUID(), name: name, colorId: colorId, items: [])
+    func createWorkspace(name: String, colorId: WorkspaceColorId, items: [Node] = []) -> UUID {
+        let workspace = Workspace(id: UUID(), name: name, colorId: colorId, items: items)
         state.workspaces.append(workspace)
         state.selectedWorkspaceId = workspace.id
         UserDefaults.standard.set(workspace.id.uuidString, forKey: UserDefaultsKeys.lastSelectedWorkspaceId)

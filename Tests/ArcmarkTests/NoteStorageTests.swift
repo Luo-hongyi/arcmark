@@ -7,6 +7,15 @@ final class NoteStorageTests: XCTestCase {
         return DataStore(baseDirectory: temp)
     }
 
+    private func makeReadOnlyICloudStore() -> DataStore {
+        let temp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        return DataStore(
+            baseDirectory: temp,
+            syncRoleProvider: { .secondary },
+            iCloudDirectoryOverride: true
+        )
+    }
+
     func testReadMissingReturnsEmptyString() {
         let storage = NoteStorage(store: makeStore())
         XCTAssertEqual(storage.read(id: UUID()), "")
@@ -52,5 +61,14 @@ final class NoteStorageTests: XCTestCase {
         let url = store.noteFileURL(for: id)
         XCTAssertTrue(url.path.contains("/Notes/"))
         XCTAssertEqual(url.pathExtension, "md")
+    }
+
+    func testReadOnlyICloudStoreRejectsWrites() {
+        let store = makeReadOnlyICloudStore()
+        let storage = NoteStorage(store: store)
+        let id = UUID()
+
+        XCTAssertThrowsError(try storage.write(id: id, content: "blocked"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.noteFileURL(for: id).path))
     }
 }

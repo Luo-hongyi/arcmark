@@ -23,7 +23,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var isUserHidden: Bool = false
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
-        UserDefaults.standard.register(defaults: [UserDefaultsKeys.tooltipsEnabled: true])
+        UserDefaults.standard.register(defaults: [
+            UserDefaultsKeys.tooltipsEnabled: true,
+            UserDefaultsKeys.syncRole: SyncRole.secondary.rawValue
+        ])
 
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
@@ -54,7 +57,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         window.isMovableByWindowBackground = true
         window.isOpaque = false
         window.isReleasedWhenClosed = false
-        window.backgroundColor = model.currentWorkspace.colorId.backgroundColor
+        window.backgroundColor = WorkspaceColorId.settingsBackground.backgroundColor
         window.minSize = NSSize(width: 280, height: 420)
         window.maxSize = NSSize(width: 520, height: 10000) // Unlimited height for attachment mode
         window.collectionBehavior = [.moveToActiveSpace]
@@ -77,6 +80,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         setupSwipeGesture()
         observeBrowserChanges()
         setupScheduler(model: model)
+        scheduleStoreReloadChecks(model: model)
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -121,7 +125,18 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     @objc private func handleSchedulerWakeOrActivate() {
         guard let scheduler, let model = mainViewController?.model else { return }
+        if model.reloadFromStoreIfChanged() {
+            return
+        }
         scheduler.sync(with: model.allScheduledLinks())
+    }
+
+    private func scheduleStoreReloadChecks(model: AppModel) {
+        for delay in [1.0, 3.0, 8.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak model] in
+                _ = model?.reloadFromStoreIfChanged()
+            }
+        }
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

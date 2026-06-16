@@ -40,6 +40,12 @@ final class NodeCollectionViewItem: NSCollectionViewItem {
         rowView.refreshHoverState()
     }
 
+    func configureSeparator(depth: Int, metrics: ListMetrics) {
+        view.alphaValue = 1
+        view.layer?.transform = CATransform3DIdentity
+        rowView.configureSeparator(depth: depth, metrics: metrics)
+    }
+
     var isInlineRenaming: Bool {
         rowView.isInlineRenaming
     }

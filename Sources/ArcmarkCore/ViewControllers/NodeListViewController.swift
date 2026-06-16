@@ -701,6 +701,8 @@ extension NodeListViewController: NSCollectionViewDataSource {
                 },
                 isSelected: isSelected
             )
+        case .separator:
+            nodeItem.configureSeparator(depth: row.depth, metrics: listMetrics)
         }
 
         return nodeItem
@@ -727,6 +729,10 @@ extension NodeListViewController: NSCollectionViewDelegate {
         }
 
         guard selectedNodeIds.isEmpty else {
+            return false
+        }
+
+        if indexPaths.contains(where: { row(at: $0)?.node.isSeparator == true }) {
             return false
         }
 
@@ -768,6 +774,8 @@ extension NodeListViewController: NSCollectionViewDelegate {
                 self.onNodeSelected?(link.id)
             case .note(let note):
                 self.onNodeSelected?(note.id)
+            case .separator:
+                break
             }
 
             self.collectionView.deselectItems(at: indexPaths)
@@ -776,6 +784,7 @@ extension NodeListViewController: NSCollectionViewDelegate {
 
     func collectionView(_ collectionView: NSCollectionView, pasteboardWriterForItemAt indexPath: IndexPath) -> NSPasteboardWriting? {
         guard let row = row(at: indexPath) else { return nil }
+        guard !row.node.isSeparator else { return nil }
         let pasteboardItem = NSPasteboardItem()
         pasteboardItem.setString(row.node.id.uuidString, forType: nodePasteboardType)
         return pasteboardItem
@@ -858,6 +867,14 @@ extension NodeListViewController: NSCollectionViewDelegate {
                 }
             case .note(let note):
                 if let location = findNodeLocation?(note.id) {
+                    targetParentId = location.parentId
+                    targetIndex = location.index
+                } else {
+                    targetParentId = nil
+                    targetIndex = nodes.count
+                }
+            case .separator(let separator):
+                if let location = findNodeLocation?(separator.id) {
                     targetParentId = location.parentId
                     targetIndex = location.index
                 } else {
@@ -1039,6 +1056,8 @@ extension NodeListViewController: NSMenuDelegate {
             delete.target = self
             delete.representedObject = node.id
             menu.addItem(delete)
+        case .separator:
+            return
         }
     }
 
@@ -1168,7 +1187,7 @@ extension NodeListViewController: NSMenuDelegate {
             switch node {
             case .link:
                 openableLinkCount += 1
-            case .note:
+            case .note, .separator:
                 break
             case .folder(let folder):
                 openableLinkCount += folder.children.filter { if case .link = $0 { return true } else { return false } }.count

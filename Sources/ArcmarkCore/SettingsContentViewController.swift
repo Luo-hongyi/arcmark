@@ -9,6 +9,7 @@ import AppKit
 final class SettingsContentViewController: NSViewController {
     // Layout constants
     private let horizontalPadding: CGFloat = 8
+    private let scrollbarContentInset: CGFloat = 20
     private let sectionSpacing: CGFloat = 12        // Distance between sections
     private let sectionHeaderSpacing: CGFloat = 8   // Distance between section name and content
     private let itemSpacing: CGFloat = 8           // Distance between items within a section
@@ -47,6 +48,9 @@ final class SettingsContentViewController: NSViewController {
     private let openSettingsButton = SettingsActionButton(title: "Open System Settings")
     private let refreshStatusButton = SettingsActionButton(title: "Refresh Status")
 
+    // Sync role section
+    private let syncRoleReadOnlyToggle = CustomToggle(title: "Readonly")
+
     // Import & Export section
     private let importButton = SettingsActionButton(title: "Import from Arc Browser")
     private let chromeImportButton = SettingsActionButton(title: "Import from Chrome, Safari, Firefox")
@@ -64,6 +68,7 @@ final class SettingsContentViewController: NSViewController {
     weak var appModel: AppModel? {
         didSet {
             reloadWorkspaces()
+            updateControlStates()
         }
     }
 
@@ -294,6 +299,15 @@ final class SettingsContentViewController: NSViewController {
 
         let separator4 = createSeparator()
 
+        // Sync Role Section
+        let syncRoleHeader = createSectionHeader("SYNC ROLE")
+
+        syncRoleReadOnlyToggle.translatesAutoresizingMaskIntoConstraints = false
+        syncRoleReadOnlyToggle.target = self
+        syncRoleReadOnlyToggle.action = #selector(syncRoleChanged(_:))
+
+        let separatorSync = createSeparator()
+
         // Import & Export Section
         let importHeader = createSectionHeader("Import & Export")
 
@@ -304,9 +318,12 @@ final class SettingsContentViewController: NSViewController {
         chromeImportButton.target = self
         chromeImportButton.action = #selector(importFromChrome)
         chromeImportButton.translatesAutoresizingMaskIntoConstraints = false
+        chromeImportButton.setActionEnabled(false)
+        chromeImportButton.toolTip = "Unavailable"
 
         // Chrome help container (centered, with icon + text)
         chromeHelpContainer.translatesAutoresizingMaskIntoConstraints = false
+        chromeHelpContainer.isHidden = true
 
         chromeHelpIcon.translatesAutoresizingMaskIntoConstraints = false
         if let infoImage = NSImage(systemSymbolName: "info.circle", accessibilityDescription: "Info") {
@@ -379,6 +396,9 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(openSettingsButton)
         contentView.addSubview(refreshStatusButton)
         contentView.addSubview(separator4)
+        contentView.addSubview(syncRoleHeader)
+        contentView.addSubview(syncRoleReadOnlyToggle)
+        contentView.addSubview(separatorSync)
         contentView.addSubview(importHeader)
         contentView.addSubview(importButton)
         contentView.addSubview(chromeImportButton)
@@ -394,8 +414,8 @@ final class SettingsContentViewController: NSViewController {
 
         // Layout constraints
         NSLayoutConstraint.activate([
-            // Content view width should match scroll view width
-            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            // Leave room for the vertical scroller so right-aligned controls remain visible.
+            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -scrollbarContentInset),
 
             // Window Settings Header
             windowSettingsHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
@@ -520,9 +540,25 @@ final class SettingsContentViewController: NSViewController {
             separator4.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             separator4.heightAnchor.constraint(equalToConstant: 1),
 
+            // Sync Role Header
+            syncRoleHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            syncRoleHeader.topAnchor.constraint(equalTo: separator4.bottomAnchor, constant: sectionSpacing),
+
+            // Sync Role Toggle
+            syncRoleReadOnlyToggle.leadingAnchor.constraint(equalTo: syncRoleHeader.leadingAnchor),
+            syncRoleReadOnlyToggle.topAnchor.constraint(equalTo: syncRoleHeader.bottomAnchor, constant: sectionHeaderSpacing),
+            syncRoleReadOnlyToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            syncRoleReadOnlyToggle.heightAnchor.constraint(equalToConstant: 22),
+
+            // Separator Sync
+            separatorSync.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            separatorSync.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            separatorSync.topAnchor.constraint(equalTo: syncRoleReadOnlyToggle.bottomAnchor, constant: sectionSpacing),
+            separatorSync.heightAnchor.constraint(equalToConstant: 1),
+
             // Import & Export Header
             importHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
-            importHeader.topAnchor.constraint(equalTo: separator4.bottomAnchor, constant: sectionSpacing),
+            importHeader.topAnchor.constraint(equalTo: separatorSync.bottomAnchor, constant: sectionSpacing),
 
             // Import Button (below header)
             importButton.leadingAnchor.constraint(equalTo: importHeader.leadingAnchor),
@@ -630,6 +666,8 @@ final class SettingsContentViewController: NSViewController {
         let swipeToSwitchEnabled = UserDefaults.standard.bool(forKey: UserDefaultsKeys.swipeToSwitchEnabled)
         swipeToSwitchToggle.isOn = swipeToSwitchEnabled
 
+        updateSyncRoleButtons()
+
         // Apply mutual exclusion and enable states
         updateControlStates()
     }
@@ -727,9 +765,33 @@ final class SettingsContentViewController: NSViewController {
             separator1ToSelectorConstraint?.isActive = false
             separator1ToToggleConstraint?.isActive = true
         }
+
+        let canWriteSharedData = appModel?.canWriteSharedData ?? SyncRole.current.canWriteICloud
+        importButton.setActionEnabled(canWriteSharedData)
+        importButton.alphaValue = 1.0
+        importButton.toolTip = canWriteSharedData ? nil : "READONLY mode disables importing on this device."
+
+        chromeImportButton.setActionEnabled(false)
+        chromeImportButton.alphaValue = 1.0
+        chromeImportButton.toolTip = "Unavailable"
     }
 
     // MARK: - Actions
+
+    @objc private func syncRoleChanged(_ sender: CustomToggle) {
+        SyncRole.current = sender.isOn ? .secondary : .primary
+        updateSyncRoleButtons()
+        updateControlStates()
+
+        if SyncRole.current == .secondary {
+            _ = appModel?.reloadFromStoreIfChanged()
+            reloadWorkspaces()
+        }
+    }
+
+    private func updateSyncRoleButtons() {
+        syncRoleReadOnlyToggle.isOn = SyncRole.current == .secondary
+    }
 
     @objc private func alwaysOnTopChanged() {
         let enabled = alwaysOnTopToggle.isOn
@@ -869,6 +931,11 @@ final class SettingsContentViewController: NSViewController {
     }
 
     @objc private func importFromArc() {
+        guard appModel?.canWriteSharedData ?? SyncRole.current.canWriteICloud else {
+            showImportStatus("READONLY mode disables importing on this device.", isError: true)
+            return
+        }
+
         // Guard against concurrent imports
         if importButton.getIsLoading() || chromeImportButton.getIsLoading() {
             return
@@ -891,23 +958,7 @@ final class SettingsContentViewController: NSViewController {
     }
 
     @objc private func importFromChrome() {
-        // Guard against concurrent imports
-        if importButton.getIsLoading() || chromeImportButton.getIsLoading() {
-            return
-        }
-
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.html]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Select your exported bookmarks HTML file"
-
-        panel.begin { [weak self] response in
-            guard response == .OK, let fileURL = panel.url else { return }
-            Task { @MainActor [weak self] in
-                await self?.handleChromeImport(fileURL: fileURL)
-            }
-        }
+        showImportStatus("This importer is unavailable.", isError: true)
     }
 
     private func handleChromeImport(fileURL: URL) async {
@@ -923,6 +974,11 @@ final class SettingsContentViewController: NSViewController {
 
         switch result {
         case .success(let importResult):
+            guard appModel?.canWriteSharedData ?? false else {
+                showImportStatus("READONLY mode disables importing on this device.", isError: true)
+                return
+            }
+
             // Apply to AppModel
             applyChromeImport(importResult)
 
@@ -981,12 +1037,17 @@ final class SettingsContentViewController: NSViewController {
 
         switch result {
         case .success(let importResult):
+            guard appModel?.canWriteSharedData ?? false else {
+                showImportStatus("READONLY mode disables importing on this device.", isError: true)
+                return
+            }
+
             // Apply to AppModel
             applyImport(importResult)
 
             // Show success message
             let message = """
-            Successfully imported:
+            Successfully imported and replaced existing workspaces:
             • \(importResult.workspacesCreated) workspaces
             • \(importResult.linksImported) links
             • \(importResult.foldersImported) folders
@@ -1006,25 +1067,12 @@ final class SettingsContentViewController: NSViewController {
     private func applyImport(_ result: ArcImportResult) {
         guard let appModel = appModel else { return }
 
-        // Remember the currently selected workspace
-        let previousWorkspaceId = appModel.state.selectedWorkspaceId
-
-        for workspace in result.workspaces {
-            // Create the workspace using AppModel's method
-            _ = appModel.createWorkspace(name: workspace.name, colorId: workspace.colorId)
-
-            // The workspace is now selected, add all nodes to it
-            for node in workspace.nodes {
-                addNodeToWorkspace(node, parentId: nil, appModel: appModel)
-            }
+        let workspaces = result.workspaces.map { workspace in
+            Workspace(id: UUID(), name: workspace.name, colorId: workspace.colorId, items: workspace.nodes)
         }
+        appModel.replaceAllWorkspaces(with: workspaces)
 
-        // Restore the previously selected workspace
-        if let previousWorkspaceId = previousWorkspaceId {
-            appModel.selectWorkspace(id: previousWorkspaceId)
-        }
-
-        // Reload the workspace list to reflect the newly imported workspaces
+        // Reload the workspace list to reflect the imported workspaces
         reloadWorkspaces()
     }
 
@@ -1040,6 +1088,8 @@ final class SettingsContentViewController: NSViewController {
             for child in folder.children {
                 addNodeToWorkspace(child, parentId: folderId, appModel: appModel)
             }
+        case .separator:
+            break
         }
     }
 
@@ -1499,7 +1549,3 @@ extension SettingsContentViewController: NSCollectionViewDelegate, NSCollectionV
         workspaceDropIndicator.hide()
     }
 }
-
-
-
-

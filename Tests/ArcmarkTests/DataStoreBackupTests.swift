@@ -105,4 +105,43 @@ final class DataStoreBackupTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: dataURL(in: directory).path))
         XCTAssertTrue(backupURLs(in: directory).isEmpty)
     }
+
+    func testSecondaryICloudLoadDoesNotCreateDefaultDataFile() {
+        let directory = makeTempDirectory()
+        let store = DataStore(
+            baseDirectory: directory,
+            syncRoleProvider: { .secondary },
+            iCloudDirectoryOverride: true
+        )
+
+        _ = store.load()
+
+        XCTAssertFalse(store.canWriteSharedData)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dataURL(in: directory).path))
+        XCTAssertTrue(backupURLs(in: directory).isEmpty)
+    }
+
+    func testSecondaryICloudSaveDoesNotWriteDataFile() {
+        let directory = makeTempDirectory()
+        let store = DataStore(
+            baseDirectory: directory,
+            syncRoleProvider: { .secondary },
+            iCloudDirectoryOverride: true
+        )
+
+        XCTAssertFalse(store.save(makeState(name: "Blocked")))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dataURL(in: directory).path))
+    }
+
+    func testPrimaryICloudSaveWritesDataFile() {
+        let directory = makeTempDirectory()
+        let store = DataStore(
+            baseDirectory: directory,
+            syncRoleProvider: { .primary },
+            iCloudDirectoryOverride: true
+        )
+
+        XCTAssertTrue(store.save(makeState(name: "Allowed")))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dataURL(in: directory).path))
+    }
 }

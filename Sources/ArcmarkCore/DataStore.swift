@@ -2,9 +2,11 @@ import Foundation
 import os
 
 final class DataStore {
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
     private let baseDirectory: URL
     private let dataURL: URL
+    private let usesICloudDirectory: Bool
+    private let syncRoleProvider: () -> SyncRole
     private let logger = Logger(subsystem: "com.arcmark.app", category: "store")
     private var hasBackedUpThisSession = false
     private let backupKeepCount = 10
@@ -16,28 +18,39 @@ final class DataStore {
         return formatter
     }()
 
-    init(baseDirectory: URL? = nil) {
-        if let baseDirectory {
-            self.baseDirectory = baseDirectory
-        } else {
-            let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            self.baseDirectory = appSupport.appendingPathComponent("Arcmark", isDirectory: true)
-        }
+    init(baseDirectory: URL? = nil,
+         fileManager: FileManager = .default,
+         syncRoleProvider: @escaping () -> SyncRole = { SyncRole.current },
+         iCloudDirectoryOverride: Bool? = nil) {
+        self.fileManager = fileManager
+        self.syncRoleProvider = syncRoleProvider
+        let resolvedBaseDirectory = baseDirectory ?? Self.defaultBaseDirectory(fileManager: fileManager)
+        self.baseDirectory = resolvedBaseDirectory
         self.dataURL = self.baseDirectory.appendingPathComponent("data.json")
+        self.usesICloudDirectory = iCloudDirectoryOverride ?? Self.isICloudDirectory(resolvedBaseDirectory, fileManager: fileManager)
+        if baseDirectory == nil, canWriteSharedData {
+            migrateLocalDataToICloudIfNeeded()
+        }
     }
 
     func load() -> AppState {
-        ensureDirectories()
+        if canWriteSharedData {
+            ensureDirectories()
+        }
+        prepareDataFileForReadIfNeeded()
+
         guard fileManager.fileExists(atPath: dataURL.path) else {
             let defaultState = Self.defaultState()
-            save(defaultState)
+            if canWriteSharedData {
+                save(defaultState)
+            }
             return defaultState
         }
 
         backupDataFileIfNeeded()
 
         do {
-            let data = try Data(contentsOf: dataURL)
+            let data = try readDataFile()
             let decoder = JSONDecoder()
             let state = try decoder.decode(AppState.self, from: data)
             return state
@@ -50,7 +63,13 @@ final class DataStore {
         }
     }
 
-    func save(_ state: AppState) {
+    @discardableResult
+    func save(_ state: AppState) -> Bool {
+        guard canWriteSharedData else {
+            logger.debug("Skipping shared data save while sync role is secondary")
+            return false
+        }
+
         backupDataFileIfNeeded()
         ensureDirectories()
         do {
@@ -58,13 +77,15 @@ final class DataStore {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(state)
             try data.write(to: dataURL, options: [.atomic])
+            return true
         } catch {
             // Failing silently to avoid crashing; this can be surfaced later in a UI.
+            return false
         }
     }
 
     func iconsDirectory() -> URL {
-        let iconsURL = baseDirectory.appendingPathComponent("Icons", isDirectory: true)
+        let iconsURL = auxiliaryBaseDirectoryForWrites().appendingPathComponent("Icons", isDirectory: true)
         if !fileManager.fileExists(atPath: iconsURL.path) {
             try? fileManager.createDirectory(at: iconsURL, withIntermediateDirectories: true)
         }
@@ -73,6 +94,7 @@ final class DataStore {
 
     func notesDirectory() -> URL {
         let notesURL = baseDirectory.appendingPathComponent("Notes", isDirectory: true)
+        guard canWriteSharedData else { return notesURL }
         if !fileManager.fileExists(atPath: notesURL.path) {
             try? fileManager.createDirectory(at: notesURL, withIntermediateDirectories: true)
         }
@@ -84,7 +106,15 @@ final class DataStore {
     }
 
     func agentEndpointFileURL() -> URL {
-        baseDirectory.appendingPathComponent("agent-endpoint.json")
+        let localDirectory = Self.localBaseDirectory(fileManager: fileManager)
+        if !fileManager.fileExists(atPath: localDirectory.path) {
+            try? fileManager.createDirectory(at: localDirectory, withIntermediateDirectories: true)
+        }
+        return localDirectory.appendingPathComponent("agent-endpoint.json")
+    }
+
+    var canWriteSharedData: Bool {
+        !usesICloudDirectory || syncRoleProvider().canWriteICloud
     }
 
     /// Copies data.json into `Backups/` once per session, before this process
@@ -92,6 +122,7 @@ final class DataStore {
     /// newest existing backup so repeated relaunches don't rotate away the last
     /// good backup. Keeps the `backupKeepCount` most recent backups.
     private func backupDataFileIfNeeded() {
+        guard canWriteSharedData else { return }
         guard !hasBackedUpThisSession else { return }
         hasBackedUpThisSession = true
 
@@ -142,6 +173,112 @@ final class DataStore {
     private func ensureDirectories() {
         if !fileManager.fileExists(atPath: baseDirectory.path) {
             try? fileManager.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
+        }
+    }
+
+    private func auxiliaryBaseDirectoryForWrites() -> URL {
+        if canWriteSharedData {
+            return baseDirectory
+        }
+        return Self.localBaseDirectory(fileManager: fileManager)
+    }
+
+    static func defaultBaseDirectory(fileManager: FileManager = .default) -> URL {
+        if let iCloudDirectory = iCloudBaseDirectory(fileManager: fileManager) {
+            return iCloudDirectory
+        }
+        return localBaseDirectory(fileManager: fileManager)
+    }
+
+    private static func isICloudDirectory(_ url: URL, fileManager: FileManager) -> Bool {
+        guard let iCloudDirectory = iCloudBaseDirectory(fileManager: fileManager) else { return false }
+        return url.standardizedFileURL == iCloudDirectory.standardizedFileURL
+    }
+
+    private static func iCloudBaseDirectory(fileManager: FileManager = .default) -> URL? {
+        let cloudDocs = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Mobile Documents", isDirectory: true)
+            .appendingPathComponent("com~apple~CloudDocs", isDirectory: true)
+        guard fileManager.fileExists(atPath: cloudDocs.path) else { return nil }
+        return cloudDocs.appendingPathComponent("Arcmark", isDirectory: true)
+    }
+
+    private static func localBaseDirectory(fileManager: FileManager = .default) -> URL {
+        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("Arcmark", isDirectory: true)
+    }
+
+    private func prepareDataFileForReadIfNeeded() {
+        guard usesICloudDirectory, fileManager.fileExists(atPath: dataURL.path) else { return }
+
+        do {
+            try fileManager.startDownloadingUbiquitousItem(at: dataURL)
+        } catch {
+            logger.debug("Could not request iCloud download for data.json: \(error.localizedDescription, privacy: .public)")
+        }
+
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            guard let values = try? dataURL.resourceValues(forKeys: [
+                .ubiquitousItemDownloadingStatusKey,
+                .ubiquitousItemIsDownloadingKey
+            ]),
+                  let status = values.ubiquitousItemDownloadingStatus else {
+                return
+            }
+
+            if status == .current || (status == .downloaded && values.ubiquitousItemIsDownloading != true) {
+                return
+            }
+
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+    }
+
+    private func readDataFile() throws -> Data {
+        guard usesICloudDirectory else {
+            return try Data(contentsOf: dataURL)
+        }
+
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var readResult: Result<Data, Error>?
+
+        coordinator.coordinate(readingItemAt: dataURL, options: [], error: &coordinationError) { coordinatedURL in
+            readResult = Result {
+                try Data(contentsOf: coordinatedURL)
+            }
+        }
+
+        if let readResult {
+            return try readResult.get()
+        }
+        if let coordinationError {
+            throw coordinationError
+        }
+        return try Data(contentsOf: dataURL)
+    }
+
+    private func migrateLocalDataToICloudIfNeeded() {
+        guard let iCloudDirectory = Self.iCloudBaseDirectory(fileManager: fileManager),
+              baseDirectory.standardizedFileURL == iCloudDirectory.standardizedFileURL else { return }
+
+        let localDirectory = Self.localBaseDirectory(fileManager: fileManager)
+        guard fileManager.fileExists(atPath: localDirectory.path),
+              !fileManager.fileExists(atPath: dataURL.path) else { return }
+
+        ensureDirectories()
+        for name in ["data.json", "Icons", "Notes"] {
+            let source = localDirectory.appendingPathComponent(name)
+            let destination = baseDirectory.appendingPathComponent(name)
+            guard fileManager.fileExists(atPath: source.path),
+                  !fileManager.fileExists(atPath: destination.path) else { continue }
+            do {
+                try fileManager.copyItem(at: source, to: destination)
+            } catch {
+                logger.error("Failed to migrate \(name, privacy: .public) to iCloud Drive: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 

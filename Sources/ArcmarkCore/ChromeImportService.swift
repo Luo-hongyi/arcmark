@@ -212,7 +212,7 @@ final class ChromeImportService: Sendable {
             switch node {
             case .link:
                 links += 1
-            case .note:
+            case .note, .separator:
                 continue
             case .folder(let folder):
                 folders += 1

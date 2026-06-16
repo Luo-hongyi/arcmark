@@ -101,13 +101,21 @@ struct ArcSpace: Codable {
     let title: String?
     let containerIDs: [String]
 
-    // Helper to get pinned container ID
-    var pinnedContainerId: String? {
-        guard let pinnedIndex = containerIDs.firstIndex(of: "pinned"),
-              pinnedIndex + 1 < containerIDs.count else {
+    var sidebarContainerIds: [String] {
+        var ids: [String] = []
+        for label in ["pinned", "unpinned"] {
+            guard let containerId = containerId(after: label) else { continue }
+            ids.append(containerId)
+        }
+        return ids
+    }
+
+    private func containerId(after label: String) -> String? {
+        guard let index = containerIDs.firstIndex(of: label),
+              index + 1 < containerIDs.count else {
             return nil
         }
-        return containerIDs[pinnedIndex + 1]
+        return containerIDs[index + 1]
     }
 }
 
@@ -296,8 +304,9 @@ final class ArcImportService: Sendable {
             throw ArcImportError.noDataContainer
         }
 
-        // Build item lookup map
+        // Build item lookup map and keep Arc's original item order for fallback traversal
         let itemsMap = buildItemsMap(itemsData)
+        let itemIds = buildItemIds(itemsData)
 
         // Parse spaces
         let spaces = spacesData.compactMap { spaceOrString -> ArcSpace? in
@@ -314,13 +323,15 @@ final class ArcImportService: Sendable {
         var workspaces: [ImportWorkspace] = []
 
         for (index, space) in spaces.enumerated() {
-            // Get pinned container ID
-            guard let pinnedContainerId = space.pinnedContainerId else {
+            let sidebarContainerIds = space.sidebarContainerIds
+            guard !sidebarContainerIds.isEmpty else {
                 continue
             }
 
-            // Build node hierarchy
-            let nodes = buildNodeHierarchy(parentId: pinnedContainerId, items: itemsMap)
+            let containerNodes = sidebarContainerIds.map { containerId in
+                buildNodeHierarchy(parentId: containerId, items: itemsMap, itemIds: itemIds)
+            }
+            let nodes = nodesWithSeparatorBetweenNonEmptyGroups(containerNodes)
 
             // Skip empty spaces
             guard !nodes.isEmpty else {
@@ -365,30 +376,56 @@ final class ArcImportService: Sendable {
         return map
     }
 
+    private func buildItemIds(_ items: [ArcItemOrString]) -> [String] {
+        items.compactMap { itemOrString -> String? in
+            if case .item(let item) = itemOrString {
+                return item.id
+            }
+            return nil
+        }
+    }
+
+    private func nodesWithSeparatorBetweenNonEmptyGroups(_ groups: [[Node]]) -> [Node] {
+        var nodes: [Node] = []
+        var needsSeparator = false
+
+        for group in groups where !group.isEmpty {
+            if needsSeparator {
+                nodes.append(.separator(Separator(id: UUID())))
+            }
+            nodes.append(contentsOf: group)
+            needsSeparator = true
+        }
+
+        return nodes
+    }
+
     /// Recursively build node hierarchy from Arc items.
     ///
     /// Uses `childrenIds` traversal when the parent item exists in the map (preserves Arc's
     /// canonical ordering and parent-child relationships). Falls back to `parentID` filtering
-    /// for the root level where the pinned container itself may not be in the items array.
-    private func buildNodeHierarchy(parentId: String, items: [String: ArcItem]) -> [Node] {
+    /// for the root level where the sidebar container itself may not be in the items array.
+    private func buildNodeHierarchy(parentId: String, items: [String: ArcItem], itemIds: [String]) -> [Node] {
         // Determine child items: prefer childrenIds lookup, fall back to parentID filtering
         let childItems: [ArcItem]
         if let parentItem = items[parentId], let childIds = parentItem.childrenIds {
             // Traverse using childrenIds (Arc's canonical ordering)
             childItems = childIds.compactMap { items[$0] }
         } else {
-            // Fallback: pinned container may not exist as an item in the map.
+            // Fallback: sidebar containers may not exist as items in the map.
             // Exclude items that are claimed by a folder's childrenIds to avoid duplication
             // (an item referenced in a folder's childrenIds belongs inside that folder,
             // even if its parentID points to the container).
             let claimedIds = collectClaimedChildIds(items: items)
-            childItems = items.values.filter { $0.parentID == parentId && !claimedIds.contains($0.id) }
+            childItems = itemIds
+                .compactMap { items[$0] }
+                .filter { $0.parentID == parentId && !claimedIds.contains($0.id) }
         }
 
         var nodes: [Node] = []
 
         for item in childItems {
-            if let node = convertItemToNode(item, items: items) {
+            if let node = convertItemToNode(item, items: items, itemIds: itemIds) {
                 nodes.append(node)
             }
         }
@@ -411,10 +448,10 @@ final class ArcImportService: Sendable {
     }
 
     /// Convert a single Arc item into an Arcmark Node, recursing into folders.
-    private func convertItemToNode(_ item: ArcItem, items: [String: ArcItem]) -> Node? {
+    private func convertItemToNode(_ item: ArcItem, items: [String: ArcItem], itemIds: [String]) -> Node? {
         // Check if it's a folder (has non-empty childrenIds)
         if let childrenIds = item.childrenIds, !childrenIds.isEmpty {
-            let childNodes = buildNodeHierarchy(parentId: item.id, items: items)
+            let childNodes = buildNodeHierarchy(parentId: item.id, items: items, itemIds: itemIds)
             let folder = Folder(
                 id: UUID(),
                 name: item.title ?? "Untitled Folder",
@@ -467,7 +504,7 @@ final class ArcImportService: Sendable {
             switch node {
             case .link:
                 links += 1
-            case .note:
+            case .note, .separator:
                 continue
             case .folder(let folder):
                 folders += 1

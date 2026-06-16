@@ -192,23 +192,7 @@ final class WorkspaceSwitcherView: NSView {
         addButton?.removeFromSuperview()
         addButton = nil
 
-        // Create settings button first
-        let settingsBtn = SettingsButton(style: style)
-        settingsBtn.translatesAutoresizingMaskIntoConstraints = false
-        settingsBtn.onTap = { [weak self] in
-            self?.onSettingsSelected?()
-        }
-
-        contentView.addSubview(settingsBtn)
-        settingsButton = settingsBtn
-
-        NSLayoutConstraint.activate([
-            settingsBtn.topAnchor.constraint(equalTo: contentView.topAnchor),
-            settingsBtn.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            settingsBtn.leadingAnchor.constraint(equalTo: contentView.leadingAnchor)
-        ])
-
-        var previousView: NSView? = settingsBtn
+        var previousView: NSView?
 
         // Create workspace buttons
         for workspace in workspaces {
@@ -275,8 +259,21 @@ final class WorkspaceSwitcherView: NSView {
             ])
         }
 
+        // Create settings button last
+        let settingsBtn = SettingsButton(style: style)
+        settingsBtn.translatesAutoresizingMaskIntoConstraints = false
+        settingsBtn.onTap = { [weak self] in
+            self?.onSettingsSelected?()
+        }
+
+        contentView.addSubview(settingsBtn)
+        settingsButton = settingsBtn
+
         NSLayoutConstraint.activate([
-            addBtn.trailingAnchor.constraint(equalTo: contentView.trailingAnchor)
+            settingsBtn.topAnchor.constraint(equalTo: contentView.topAnchor),
+            settingsBtn.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            settingsBtn.leadingAnchor.constraint(equalTo: addBtn.trailingAnchor, constant: style.buttonSpacing),
+            settingsBtn.trailingAnchor.constraint(equalTo: contentView.trailingAnchor)
         ])
 
         updateSelection()
@@ -694,4 +691,3 @@ extension WorkspaceButton: NSTextFieldDelegate {
         }
     }
 }
-

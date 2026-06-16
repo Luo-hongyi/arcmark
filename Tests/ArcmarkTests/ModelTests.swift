@@ -7,6 +7,18 @@ final class ModelTests: XCTestCase {
         return DataStore(baseDirectory: temp)
     }
 
+    private func makeReadOnlyICloudStore(directory: URL) -> DataStore {
+        DataStore(
+            baseDirectory: directory,
+            syncRoleProvider: { .secondary },
+            iCloudDirectoryOverride: true
+        )
+    }
+
+    private func dataURL(in directory: URL) -> URL {
+        directory.appendingPathComponent("data.json")
+    }
+
     func testJSONRoundTrip() throws {
         let link = Link(id: UUID(), title: "Example", url: "https://example.com", faviconPath: nil)
         let folder = Folder(id: UUID(), name: "Folder", children: [.link(link)], isExpanded: true)
@@ -118,6 +130,137 @@ final class ModelTests: XCTestCase {
         model.moveWorkspace(id: id3, direction: .right)
         XCTAssertEqual(model.workspaces[2].name, "Second")
         XCTAssertEqual(model.workspaces[3].name, "Third")
+    }
+
+    func testReplaceAllWorkspacesOverwritesExistingDataAndDoesNotPersistSettingsSelection() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let originalWorkspaceId = model.currentWorkspace.id
+        model.addLink(urlString: "https://old.example", title: "Old", parentId: nil)
+        model.createWorkspace(name: "Manual", colorId: .ruby)
+        model.selectSettings()
+
+        let importedLink = Link(id: UUID(), title: "Imported", url: "https://arc.example", faviconPath: nil)
+        let importedFolder = Folder(id: UUID(), name: "Arc Folder", children: [.link(importedLink)], isExpanded: false)
+        let importedWorkspace = Workspace(
+            id: UUID(),
+            name: "Arc Space",
+            colorId: .ocean,
+            items: [.folder(importedFolder)]
+        )
+
+        model.replaceAllWorkspaces(with: [importedWorkspace])
+
+        XCTAssertEqual(model.workspaces.count, 1)
+        XCTAssertEqual(model.workspaces[0].id, importedWorkspace.id)
+        XCTAssertEqual(model.workspaces[0].name, "Arc Space")
+        XCTAssertFalse(model.workspaces.contains { $0.id == originalWorkspaceId })
+        XCTAssertTrue(model.state.isSettingsSelected)
+        XCTAssertNil(model.state.selectedWorkspaceId)
+
+        guard case .folder(let folder) = model.workspaces[0].items.first else {
+            XCTFail("Expected imported folder")
+            return
+        }
+        XCTAssertEqual(folder.name, "Arc Folder")
+        XCTAssertEqual(folder.children.count, 1)
+        if case .link(let link) = folder.children[0] {
+            XCTAssertEqual(link.title, "Imported")
+            XCTAssertEqual(link.url, "https://arc.example")
+        } else {
+            XCTFail("Expected imported link")
+        }
+
+        let reloaded = AppModel(store: store)
+        XCTAssertEqual(reloaded.workspaces.count, 1)
+        XCTAssertEqual(reloaded.workspaces[0].name, "Arc Space")
+        XCTAssertFalse(reloaded.state.isSettingsSelected)
+        XCTAssertEqual(reloaded.state.selectedWorkspaceId, importedWorkspace.id)
+    }
+
+    func testReloadFromStoreIfChangedUpdatesState() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+        var changeCount = 0
+        model.onChange = {
+            changeCount += 1
+        }
+
+        let workspace = Workspace(
+            id: UUID(),
+            name: "Synced",
+            colorId: .moss,
+            items: []
+        )
+        store.save(AppState(
+            schemaVersion: 1,
+            workspaces: [workspace],
+            selectedWorkspaceId: workspace.id,
+            isSettingsSelected: false
+        ))
+
+        XCTAssertTrue(model.reloadFromStoreIfChanged())
+        XCTAssertEqual(model.workspaces.map(\.name), ["Synced"])
+        XCTAssertEqual(changeCount, 1)
+        XCTAssertFalse(model.reloadFromStoreIfChanged())
+        XCTAssertEqual(changeCount, 1)
+    }
+
+    func testReadOnlySyncRoleBlocksSharedMutationsButAllowsSettingsSelection() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = makeReadOnlyICloudStore(directory: directory)
+        let model = AppModel(store: store)
+        let initialWorkspaceId = model.currentWorkspace.id
+
+        model.createWorkspace(name: "Blocked", colorId: .ruby)
+        model.addLink(urlString: "https://blocked.example", title: "Blocked", parentId: nil)
+
+        XCTAssertEqual(model.workspaces.count, 1)
+        XCTAssertEqual(model.workspaces[0].id, initialWorkspaceId)
+        XCTAssertTrue(model.workspaces[0].items.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dataURL(in: directory).path))
+
+        model.selectSettings()
+        XCTAssertTrue(model.state.isSettingsSelected)
+    }
+
+    func testReadOnlySyncRoleAllowsFolderExpansionWithoutPersisting() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let folder = Folder(id: UUID(), name: "Folder", children: [], isExpanded: false)
+        let workspace = Workspace(
+            id: UUID(),
+            name: "Synced",
+            colorId: .moss,
+            items: [.folder(folder)]
+        )
+        let state = AppState(
+            schemaVersion: 1,
+            workspaces: [workspace],
+            selectedWorkspaceId: workspace.id,
+            isSettingsSelected: false
+        )
+        let data = try JSONEncoder().encode(state)
+        try data.write(to: dataURL(in: directory))
+
+        let store = makeReadOnlyICloudStore(directory: directory)
+        let model = AppModel(store: store)
+        var changeCount = 0
+        model.onChange = { changeCount += 1 }
+
+        model.setFolderExpanded(id: folder.id, isExpanded: true)
+
+        guard let updated = model.nodeById(folder.id), case .folder(let updatedFolder) = updated else {
+            XCTFail("Expected folder to exist")
+            return
+        }
+        XCTAssertTrue(updatedFolder.isExpanded)
+        XCTAssertEqual(changeCount, 1)
+        XCTAssertEqual(try Data(contentsOf: dataURL(in: directory)), data)
     }
 
     // MARK: - Pinned Links Tests
@@ -486,6 +629,8 @@ final class ModelTests: XCTestCase {
                 collectedLinks.append(link)
             case .note:
                 break
+            case .separator:
+                break
             case .folder(let folder):
                 for child in folder.children {
                     if case .link(let link) = child {
@@ -517,6 +662,8 @@ final class ModelTests: XCTestCase {
             case .link(let link):
                 collectedLinks.append(link)
             case .note:
+                break
+            case .separator:
                 break
             case .folder(let folder):
                 for child in folder.children {
@@ -552,6 +699,8 @@ final class ModelTests: XCTestCase {
                 collectedLinks.append(link)
             case .note:
                 break
+            case .separator:
+                break
             case .folder(let folder):
                 for child in folder.children {
                     if case .link(let link) = child {
@@ -586,6 +735,8 @@ final class ModelTests: XCTestCase {
                 collectedLinks.append(link)
             case .note:
                 break
+            case .separator:
+                break
             case .folder(let folder):
                 for child in folder.children {
                     if case .link(let link) = child {
@@ -619,6 +770,8 @@ final class ModelTests: XCTestCase {
             case .link(let link):
                 collectedLinks.append(link)
             case .note:
+                break
+            case .separator:
                 break
             case .folder(let folder):
                 for child in folder.children {

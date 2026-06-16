@@ -272,7 +272,7 @@ final class MainViewController: NSViewController {
                 self.openLink(link)
             case .note(let note):
                 self.openNote(note)
-            case .folder:
+            case .folder, .separator:
                 break
             }
         }
@@ -357,6 +357,8 @@ final class MainViewController: NSViewController {
                             self.openLink(link)
                         }
                     }
+                case .separator:
+                    break
                 }
             }
         }
@@ -384,7 +386,7 @@ final class MainViewController: NSViewController {
                 self.showIconPicker(for: nodeId, relativeTo: anchorView, hasCustomIcon: link.customIcon != nil, kind: .link)
             case .note(let note):
                 self.showIconPicker(for: nodeId, relativeTo: anchorView, hasCustomIcon: note.customIcon != nil, kind: .note)
-            case .folder:
+            case .folder, .separator:
                 break
             }
         }
@@ -469,15 +471,15 @@ final class MainViewController: NSViewController {
         } else {
             let selectedId = model.currentWorkspace.id
             workspaceSwitcher.selectedWorkspaceId = selectedId
-            workspaceSwitcher.workspaceColor = model.currentWorkspace.colorId
+            workspaceSwitcher.workspaceColor = .settingsBackground
         }
 
         handlePendingWorkspaceRename()
     }
 
     private func applyWorkspaceStyling() {
-        let newColor = model.currentWorkspace.colorId.backgroundColor
-        nodeListViewController.workspaceColor = model.currentWorkspace.colorId
+        let newColor = WorkspaceColorId.settingsBackground.backgroundColor
+        nodeListViewController.workspaceColor = .settingsBackground
 
         if let fromColor = swipeColorAnimationFromColor {
             // Animate background color transition during swipe
@@ -510,7 +512,7 @@ final class MainViewController: NSViewController {
         settingsViewController.view.isHidden = false
 
         // Apply settings background color
-        let settingsColor = NSColor(calibratedRed: 0.898, green: 0.906, blue: 0.922, alpha: 1.0)
+        let settingsColor = WorkspaceColorId.settingsBackground.backgroundColor
 
         if let fromColor = swipeColorAnimationFromColor {
             swipeColorAnimationFromColor = nil
@@ -1044,12 +1046,7 @@ extension MainViewController: SwipeGestureServiceDelegate {
         isSwipeAnimating = true
 
         // Save current color so applyWorkspaceStyling can animate the transition
-        let currentBgColor: NSColor
-        if model.state.isSettingsSelected {
-            currentBgColor = ThemeConstants.Colors.settingsBackground
-        } else {
-            currentBgColor = model.currentWorkspace.colorId.backgroundColor
-        }
+        let currentBgColor = WorkspaceColorId.settingsBackground.backgroundColor
 
         // --- Snapshot-based animation ---
         // Capture a snapshot of the current workspace content at its current drag position
@@ -1323,13 +1320,8 @@ extension MainViewController: SwipeGestureServiceDelegate {
         let containerWidth = swipeClipContainer.bounds.width
         let containerHeight = swipeClipContainer.bounds.height
 
-        // Use the CURRENT workspace's background color so the preview blends seamlessly
-        let currentBgColor: NSColor
-        if model.state.isSettingsSelected {
-            currentBgColor = ThemeConstants.Colors.settingsBackground
-        } else {
-            currentBgColor = model.currentWorkspace.colorId.backgroundColor
-        }
+        // Use the app background color so the preview blends seamlessly
+        let currentBgColor = WorkspaceColorId.settingsBackground.backgroundColor
 
         if swipePreviewView == nil {
             let preview = NSView()

@@ -12,8 +12,40 @@ final class AppModel {
         self.store = store
         self.noteStorage = NoteStorage(store: store)
         self.state = store.load()
+        normalizeSelection()
+    }
 
+    @discardableResult
+    func reloadFromStoreIfChanged() -> Bool {
+        let previousState = state
+        let wasSettingsSelected = state.isSettingsSelected
+        let previousSelectedWorkspaceId = state.selectedWorkspaceId
+        state = store.load()
+        restoreLocalSelection(isSettingsSelected: wasSettingsSelected, selectedWorkspaceId: previousSelectedWorkspaceId)
+        normalizeSelection()
+        guard state != previousState else { return false }
+        onChange?()
+        return true
+    }
+
+    private func restoreLocalSelection(isSettingsSelected: Bool, selectedWorkspaceId: UUID?) {
+        state.isSettingsSelected = isSettingsSelected
+        if isSettingsSelected {
+            state.selectedWorkspaceId = nil
+        } else if let selectedWorkspaceId,
+                  state.workspaces.contains(where: { $0.id == selectedWorkspaceId }) {
+            state.selectedWorkspaceId = selectedWorkspaceId
+        } else {
+            state.selectedWorkspaceId = nil
+        }
+    }
+
+    private func normalizeSelection() {
         if !state.isSettingsSelected {
+            if let selectedWorkspaceId = state.selectedWorkspaceId,
+               !state.workspaces.contains(where: { $0.id == selectedWorkspaceId }) {
+                state.selectedWorkspaceId = nil
+            }
             if let savedId = UserDefaults.standard.string(forKey: UserDefaultsKeys.lastSelectedWorkspaceId),
                let uuid = UUID(uuidString: savedId),
                state.workspaces.contains(where: { $0.id == uuid }) {
@@ -27,6 +59,10 @@ final class AppModel {
 
     var workspaces: [Workspace] {
         state.workspaces
+    }
+
+    var canWriteSharedData: Bool {
+        store.canWriteSharedData
     }
 
     var currentWorkspace: Workspace {
@@ -49,17 +85,18 @@ final class AppModel {
         state.selectedWorkspaceId = id
         state.isSettingsSelected = false
         UserDefaults.standard.set(id.uuidString, forKey: UserDefaultsKeys.lastSelectedWorkspaceId)
-        persist()
+        onChange?()
     }
 
     func selectSettings() {
         state.isSettingsSelected = true
         state.selectedWorkspaceId = nil
-        persist()
+        onChange?()
     }
 
     @discardableResult
     func createWorkspace(name: String, colorId: WorkspaceColorId) -> UUID {
+        guard guardCanWriteSharedData() else { return currentWorkspace.id }
         let workspace = Workspace(id: UUID(), name: name, colorId: colorId, items: [])
         state.workspaces.append(workspace)
         state.selectedWorkspaceId = workspace.id
@@ -93,6 +130,7 @@ final class AppModel {
     }
 
     func deleteWorkspace(id: UUID) {
+        guard guardCanWriteSharedData() else { return }
         guard state.workspaces.count > 1 else { return }
         state.workspaces.removeAll { $0.id == id }
         if state.selectedWorkspaceId == id {
@@ -105,6 +143,7 @@ final class AppModel {
     }
 
     func moveWorkspace(id: UUID, direction: WorkspaceMoveDirection) {
+        guard guardCanWriteSharedData() else { return }
         guard let currentIndex = state.workspaces.firstIndex(where: { $0.id == id }) else { return }
 
         let newIndex: Int
@@ -123,6 +162,7 @@ final class AppModel {
     }
 
     func reorderWorkspace(id: UUID, toIndex: Int) {
+        guard guardCanWriteSharedData() else { return }
         guard let currentIndex = state.workspaces.firstIndex(where: { $0.id == id }) else { return }
         guard toIndex >= 0 && toIndex < state.workspaces.count else { return }
         guard currentIndex != toIndex else { return }
@@ -132,8 +172,23 @@ final class AppModel {
         persist()
     }
 
+    func replaceAllWorkspaces(with workspaces: [Workspace]) {
+        guard guardCanWriteSharedData() else { return }
+        guard !workspaces.isEmpty else { return }
+
+        let keepSettingsSelected = state.isSettingsSelected
+        state.workspaces = workspaces
+        state.isSettingsSelected = keepSettingsSelected
+        state.selectedWorkspaceId = keepSettingsSelected ? nil : workspaces.first?.id
+        if let selectedWorkspaceId = state.selectedWorkspaceId {
+            UserDefaults.standard.set(selectedWorkspaceId.uuidString, forKey: UserDefaultsKeys.lastSelectedWorkspaceId)
+        }
+        persist()
+    }
+
     @discardableResult
     func addFolder(name: String, parentId: UUID?, isExpanded: Bool = true) -> UUID {
+        guard guardCanWriteSharedData() else { return UUID() }
         guard let id = addFolder(name: name, workspaceId: currentWorkspace.id, parentId: parentId, isExpanded: isExpanded) else {
             preconditionFailure("currentWorkspace is missing from state.workspaces")
         }
@@ -142,6 +197,7 @@ final class AppModel {
 
     @discardableResult
     func addFolder(name: String, workspaceId: UUID, parentId: UUID?, isExpanded: Bool = true) -> UUID? {
+        guard guardCanWriteSharedData() else { return nil }
         guard state.workspaces.contains(where: { $0.id == workspaceId }) else { return nil }
         let folder = Folder(id: UUID(), name: name, children: [], isExpanded: isExpanded)
         updateWorkspace(id: workspaceId) { workspace in
@@ -152,6 +208,7 @@ final class AppModel {
 
     @discardableResult
     func addLink(urlString: String, title: String, parentId: UUID?) -> UUID {
+        guard guardCanWriteSharedData() else { return UUID() }
         guard let id = addLink(urlString: urlString, title: title, workspaceId: currentWorkspace.id, parentId: parentId) else {
             preconditionFailure("currentWorkspace is missing from state.workspaces")
         }
@@ -160,6 +217,7 @@ final class AppModel {
 
     @discardableResult
     func addLink(urlString: String, title: String, workspaceId: UUID, parentId: UUID?) -> UUID? {
+        guard guardCanWriteSharedData() else { return nil }
         guard state.workspaces.contains(where: { $0.id == workspaceId }) else { return nil }
         let link = Link(id: UUID(), title: title, url: urlString, faviconPath: nil)
         updateWorkspace(id: workspaceId) { workspace in
@@ -171,6 +229,7 @@ final class AppModel {
 
     @discardableResult
     func addNote(title: String, parentId: UUID?, content: String = "") -> UUID {
+        guard guardCanWriteSharedData() else { return UUID() }
         guard let id = addNote(title: title, workspaceId: currentWorkspace.id, parentId: parentId, content: content) else {
             preconditionFailure("currentWorkspace is missing from state.workspaces")
         }
@@ -179,6 +238,7 @@ final class AppModel {
 
     @discardableResult
     func addNote(title: String, workspaceId: UUID, parentId: UUID?, content: String = "") -> UUID? {
+        guard guardCanWriteSharedData() else { return nil }
         guard state.workspaces.contains(where: { $0.id == workspaceId }) else { return nil }
         let note = Note(id: UUID(), title: title, customIcon: nil)
         try? noteStorage.write(id: note.id, content: content)
@@ -200,11 +260,14 @@ final class AppModel {
             case .note(var note):
                 note.title = newName
                 node = .note(note)
+            case .separator:
+                break
             }
         }
     }
 
     func deleteNode(id: UUID) {
+        guard guardCanWriteSharedData() else { return }
         guard let wsId = workspaceIdContaining(nodeId: id) else { return }
         var removed: Node?
         updateWorkspace(id: wsId) { workspace in
@@ -227,10 +290,13 @@ final class AppModel {
             for child in folder.children {
                 cleanupFiles(for: child)
             }
+        case .separator:
+            break
         }
     }
 
     func moveNode(id: UUID, toParentId: UUID?, index: Int) {
+        guard guardCanWriteSharedData() else { return }
         guard let sourceWsId = workspaceIdContaining(nodeId: id),
               let sourceWs = state.workspaces.first(where: { $0.id == sourceWsId }),
               let location = findNodeLocation(id: id, nodes: sourceWs.items) else { return }
@@ -253,6 +319,7 @@ final class AppModel {
     }
 
     func moveNodeToWorkspace(id: UUID, workspaceId: UUID, parentId: UUID?, index: Int?) {
+        guard guardCanWriteSharedData() else { return }
         guard state.workspaces.contains(where: { $0.id == workspaceId }) else { return }
         guard let sourceWsId = workspaceIdContaining(nodeId: id) else { return }
         guard sourceWsId != workspaceId else {
@@ -280,12 +347,29 @@ final class AppModel {
     }
 
     func setFolderExpanded(id: UUID, isExpanded: Bool) {
+        guard let node = nodeById(id),
+              case .folder(let currentFolder) = node,
+              currentFolder.isExpanded != isExpanded else { return }
+
+        if !canWriteSharedData {
+            guard let wsId = workspaceIdContaining(nodeId: id),
+                  let wsIndex = state.workspaces.firstIndex(where: { $0.id == wsId }) else { return }
+            _ = updateNode(id: id, nodes: &state.workspaces[wsIndex].items) { node in
+                if case .folder(var folder) = node {
+                    folder.isExpanded = isExpanded
+                    node = .folder(folder)
+                }
+            }
+            onChange?()
+            return
+        }
+
         updateNode(id: id) { node in
             switch node {
             case .folder(var folder):
                 folder.isExpanded = isExpanded
                 node = .folder(folder)
-            case .link, .note:
+            case .link, .note, .separator:
                 break
             }
         }
@@ -300,7 +384,7 @@ final class AppModel {
             case .link(var link):
                 link.faviconPath = path
                 node = .link(link)
-            case .folder, .note:
+            case .folder, .note, .separator:
                 break
             }
         }
@@ -348,7 +432,7 @@ final class AppModel {
                 }
             case .folder(let folder):
                 collectScheduledEntries(in: folder.children, into: &result)
-            case .note:
+            case .note, .separator:
                 break
             }
         }
@@ -363,7 +447,7 @@ final class AppModel {
                 }
             case .folder(let folder):
                 collectScheduled(in: folder.children, workspaceId: workspaceId, into: &result)
-            case .note:
+            case .note, .separator:
                 break
             }
         }
@@ -376,13 +460,14 @@ final class AppModel {
                 link.url = newUrl
                 link.faviconPath = nil
                 node = .link(link)
-            case .folder, .note:
+            case .folder, .note, .separator:
                 break
             }
         }
     }
 
     func updateLinkTitleIfDefault(id: UUID, newTitle: String) -> Bool {
+        guard guardCanWriteSharedData() else { return false }
         let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
 
@@ -396,7 +481,7 @@ final class AppModel {
             case .link(var link):
                 link.title = trimmed
                 node = .link(link)
-            case .folder, .note:
+            case .folder, .note, .separator:
                 break
             }
         }
@@ -407,7 +492,7 @@ final class AppModel {
     // MARK: - Pinned Links
 
     var canPinMore: Bool {
-        currentWorkspace.pinnedLinks.count < Workspace.maxPinnedLinks
+        canWriteSharedData && currentWorkspace.pinnedLinks.count < Workspace.maxPinnedLinks
     }
 
     func pinnedLinkById(_ id: UUID) -> Link? {
@@ -446,7 +531,7 @@ final class AppModel {
             case .link(var link):
                 link.customIcon = icon
                 node = .link(link)
-            case .folder, .note:
+            case .folder, .note, .separator:
                 break
             }
         }
@@ -458,7 +543,7 @@ final class AppModel {
             case .note(var note):
                 note.customIcon = icon
                 node = .note(note)
-            case .folder, .link:
+            case .folder, .link, .separator:
                 break
             }
         }
@@ -506,6 +591,7 @@ final class AppModel {
     }
 
     func moveNodesToWorkspace(nodeIds: [UUID], toWorkspaceId: UUID) {
+        guard guardCanWriteSharedData() else { return }
         guard toWorkspaceId != currentWorkspace.id else { return }
         guard !nodeIds.isEmpty else { return }
 
@@ -526,6 +612,7 @@ final class AppModel {
 
     @discardableResult
     func groupNodesInNewFolder(nodeIds: [UUID], folderName: String) -> UUID? {
+        guard guardCanWriteSharedData() else { return nil }
         guard !nodeIds.isEmpty else { return nil }
 
         // Find locations BEFORE removal to determine correct insertion point
@@ -566,6 +653,7 @@ final class AppModel {
     }
 
     private func updateWorkspace(id: UUID, notify: Bool = true, _ mutate: (inout Workspace) -> Void) {
+        guard guardCanWriteSharedData() else { return }
         guard let index = state.workspaces.firstIndex(where: { $0.id == id }) else { return }
         mutate(&state.workspaces[index])
         persist(notify: notify)
@@ -579,10 +667,25 @@ final class AppModel {
     }
 
     private func persist(notify: Bool = true) {
-        store.save(state)
+        store.save(stateForPersistence())
         if notify {
             onChange?()
         }
+    }
+
+    private func stateForPersistence() -> AppState {
+        AppState(
+            schemaVersion: state.schemaVersion,
+            workspaces: state.workspaces,
+            selectedWorkspaceId: nil,
+            isSettingsSelected: false
+        )
+    }
+
+    private func guardCanWriteSharedData() -> Bool {
+        if store.canWriteSharedData { return true }
+        logger.debug("Ignored shared data mutation while sync role is secondary")
+        return false
     }
 
     private func insertNode(_ node: Node, parentId: UUID?, index: Int?, nodes: inout [Node]) {
@@ -602,7 +705,7 @@ final class AppModel {
                     }
                     insertNode(node, parentId: parentId, index: index, nodes: &folder.children)
                     nodes[i] = .folder(folder)
-                case .link, .note:
+                case .link, .note, .separator:
                     continue
                 }
             }
@@ -644,6 +747,13 @@ final class AppModel {
                     nodes[index] = .folder(folder)
                     return true
                 }
+            case .separator(let separator):
+                if separator.id == id {
+                    var node = nodes[index]
+                    mutate(&node)
+                    nodes[index] = node
+                    return true
+                }
             }
         }
         return false
@@ -668,6 +778,10 @@ final class AppModel {
                     nodes[index] = .folder(folder)
                     return removed
                 }
+            case .separator(let separator):
+                if separator.id == id {
+                    return nodes.remove(at: index)
+                }
             }
         }
         return nil
@@ -690,6 +804,10 @@ final class AppModel {
                 }
                 if let location = findNodeLocation(id: id, nodes: folder.children, parentId: folder.id) {
                     return location
+                }
+            case .separator(let separator):
+                if separator.id == id {
+                    return NodeLocation(parentId: parentId, index: index)
                 }
             }
         }
@@ -727,6 +845,8 @@ final class AppModel {
                 if let found = nodeById(id, nodes: folder.children) {
                     return found
                 }
+            case .separator(let separator):
+                if separator.id == id { return node }
             }
         }
         return nil
@@ -741,6 +861,8 @@ final class AppModel {
         case .folder(let folder):
             if folder.id == id { return true }
             return folder.children.contains(where: { containsNode(id, within: $0) })
+        case .separator(let separator):
+            return separator.id == id
         }
     }
 }

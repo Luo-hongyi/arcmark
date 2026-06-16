@@ -3,6 +3,7 @@ import Foundation
 
 extension Notification.Name {
     static let defaultBrowserChanged = Notification.Name("defaultBrowserChanged")
+    static let syncRoleChanged = Notification.Name("syncRoleChanged")
 }
 
 enum UserDefaultsKeys {
@@ -17,6 +18,30 @@ enum UserDefaultsKeys {
     static let toggleSidebarShortcut = "toggleSidebarShortcut"
     static let tooltipsEnabled = "tooltipsEnabled"
     static let swipeToSwitchEnabled = "swipeToSwitchEnabled"
+    static let syncRole = "syncRole"
+}
+
+enum SyncRole: String {
+    case secondary
+    case primary
+
+    static var current: SyncRole {
+        get {
+            guard let rawValue = UserDefaults.standard.string(forKey: UserDefaultsKeys.syncRole),
+                  let role = SyncRole(rawValue: rawValue) else {
+                return .secondary
+            }
+            return role
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: UserDefaultsKeys.syncRole)
+            NotificationCenter.default.post(name: .syncRoleChanged, object: nil)
+        }
+    }
+
+    var canWriteICloud: Bool {
+        self == .primary
+    }
 }
 
 let nodePasteboardType = NSPasteboard.PasteboardType("com.arcmark.node")

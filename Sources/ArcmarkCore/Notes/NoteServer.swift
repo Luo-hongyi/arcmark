@@ -293,6 +293,8 @@ final class NoteServer {
         do {
             try noteStorage.write(id: id, content: content)
             sendJSON(["ok": true], on: connection)
+        } catch NoteStorageError.readOnly {
+            sendStatus(403, message: "Read Only", on: connection)
         } catch {
             sendStatus(500, message: "Write Failed", on: connection)
         }

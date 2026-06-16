@@ -11,6 +11,8 @@ enum NodeFiltering {
             case .note(let note):
                 let matches = note.title.lowercased().contains(lower)
                 return matches ? node : nil
+            case .separator:
+                return nil
             case .folder(var folder):
                 let children = filter(nodes: folder.children, query: query)
                 if !children.isEmpty {

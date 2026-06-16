@@ -7,7 +7,9 @@ final class NodeRowView: BaseView {
     private let clockBadgeContainer = NSView()
     private let clockBadgeHoverOverlay = NSView()
     private let clockIconView = NSImageView()
+    private let separatorLine = NSView()
     private var isSelected = false
+    private var isSeparator = false
     private var showsDeleteButton = false
     private var isScheduled = false
     private var scheduleBadgeBackgroundColor: NSColor?
@@ -23,6 +25,7 @@ final class NodeRowView: BaseView {
     private var iconHeightConstraint: NSLayoutConstraint?
     private var titleTrailingToDeleteButton: NSLayoutConstraint!
     private var titleTrailingToEdge: NSLayoutConstraint!
+    private var separatorLeadingConstraint: NSLayoutConstraint?
 
     private static let scheduleBadgeSize: CGFloat = 14
     private static let scheduleBadgePadding: CGFloat = 1.5
@@ -73,16 +76,22 @@ final class NodeRowView: BaseView {
         clockIconView.translatesAutoresizingMaskIntoConstraints = false
         clockIconView.imageScaling = .scaleProportionallyDown
 
+        separatorLine.translatesAutoresizingMaskIntoConstraints = false
+        separatorLine.wantsLayer = true
+        separatorLine.isHidden = true
+
         addSubview(iconView)
         addSubview(editableTitle)
         addSubview(deleteButton)
         addSubview(clockBadgeContainer)
+        addSubview(separatorLine)
         clockBadgeContainer.addSubview(clockBadgeHoverOverlay)
         clockBadgeContainer.addSubview(clockIconView)
 
         iconLeadingConstraint = iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16)
         iconWidthConstraint = iconView.widthAnchor.constraint(equalToConstant: 26)
         iconHeightConstraint = iconView.heightAnchor.constraint(equalToConstant: 26)
+        separatorLeadingConstraint = separatorLine.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16)
 
         titleTrailingToDeleteButton = editableTitle.trailingAnchor.constraint(
             lessThanOrEqualTo: deleteButton.leadingAnchor, constant: -14)
@@ -117,7 +126,12 @@ final class NodeRowView: BaseView {
             clockIconView.centerXAnchor.constraint(equalTo: clockBadgeContainer.centerXAnchor),
             clockIconView.centerYAnchor.constraint(equalTo: clockBadgeContainer.centerYAnchor),
             clockIconView.widthAnchor.constraint(equalToConstant: Self.scheduleBadgeIconSize),
-            clockIconView.heightAnchor.constraint(equalToConstant: Self.scheduleBadgeIconSize)
+            clockIconView.heightAnchor.constraint(equalToConstant: Self.scheduleBadgeIconSize),
+
+            separatorLeadingConstraint!,
+            separatorLine.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+            separatorLine.centerYAnchor.constraint(equalTo: centerYAnchor),
+            separatorLine.heightAnchor.constraint(equalToConstant: 1)
         ])
 
     }
@@ -137,10 +151,14 @@ final class NodeRowView: BaseView {
         self.tooltipURL = tooltipURL
         self.metrics = metrics
         self.isSelected = isSelected
+        isSeparator = false
         self.isScheduled = isScheduled
         self.scheduleBadgeBackgroundColor = scheduleBadgeBackgroundColor
         configureClockBadge()
         updateVisualState()
+        separatorLine.isHidden = true
+        iconView.isHidden = false
+        editableTitle.isHidden = false
         if editableTitle.isEditing {
             if editableTitle.text != title {
                 cancelInlineRename()
@@ -169,8 +187,34 @@ final class NodeRowView: BaseView {
         refreshHoverState()
     }
 
+    func configureSeparator(depth: Int, metrics: ListMetrics) {
+        tooltipShowTask?.cancel()
+        tooltipShowTask = nil
+        tooltipURL = nil
+        self.metrics = metrics
+        isSelected = false
+        isSeparator = true
+        isScheduled = false
+        showsDeleteButton = false
+        onDelete = nil
+
+        editableTitle.cancelInlineRename()
+        editableTitle.isHidden = true
+        iconView.isHidden = true
+        deleteButton.isHidden = true
+        clockBadgeContainer.isHidden = true
+        clockBadgeHoverOverlay.isHidden = true
+        separatorLine.isHidden = false
+        separatorLine.layer?.backgroundColor = ThemeConstants.Colors.darkGray
+            .withAlphaComponent(ThemeConstants.Opacity.subtle)
+            .cgColor
+        separatorLeadingConstraint?.constant = metrics.leftPadding + CGFloat(depth) * metrics.indentWidth
+        layer?.backgroundColor = NSColor.clear.cgColor
+    }
+
     func setIndentation(depth: Int, metrics: ListMetrics) {
         iconLeadingConstraint?.constant = metrics.leftPadding + CGFloat(depth) * metrics.indentWidth
+        separatorLeadingConstraint?.constant = metrics.leftPadding + CGFloat(depth) * metrics.indentWidth
     }
 
     var isInlineRenaming: Bool {
@@ -217,6 +261,16 @@ final class NodeRowView: BaseView {
     }
 
     private func updateVisualState() {
+        if isSeparator {
+            layer?.backgroundColor = NSColor.clear.cgColor
+            deleteButton.isHidden = true
+            clockBadgeContainer.isHidden = true
+            clockBadgeHoverOverlay.isHidden = true
+            titleTrailingToDeleteButton.isActive = false
+            titleTrailingToEdge.isActive = true
+            return
+        }
+
         let showDelete: Bool
         let showBadgeHoverOverlay: Bool
         if isSelected {

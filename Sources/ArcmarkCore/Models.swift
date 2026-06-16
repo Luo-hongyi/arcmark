@@ -145,22 +145,29 @@ struct Note: Codable, Identifiable, Equatable, Sendable {
     var customIcon: CustomIcon?
 }
 
+struct Separator: Codable, Identifiable, Equatable, Sendable {
+    var id: UUID
+}
+
 enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
     case folder(Folder)
     case link(Link)
     case note(Note)
+    case separator(Separator)
 
     enum CodingKeys: String, CodingKey {
         case type
         case folder
         case link
         case note
+        case separator
     }
 
     enum NodeType: String, Codable {
         case folder
         case link
         case note
+        case separator
     }
 
     var id: UUID {
@@ -171,6 +178,8 @@ enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
             return link.id
         case .note(let note):
             return note.id
+        case .separator(let separator):
+            return separator.id
         }
     }
 
@@ -182,7 +191,14 @@ enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
             return link.title
         case .note(let note):
             return note.title
+        case .separator:
+            return ""
         }
+    }
+
+    var isSeparator: Bool {
+        if case .separator = self { return true }
+        return false
     }
 
     static func == (lhs: Node, rhs: Node) -> Bool {
@@ -206,6 +222,9 @@ enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
         case .note:
             let note = try container.decode(Note.self, forKey: .note)
             self = .note(note)
+        case .separator:
+            let separator = try container.decode(Separator.self, forKey: .separator)
+            self = .separator(separator)
         }
     }
 
@@ -221,6 +240,9 @@ enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
         case .note(let note):
             try container.encode(NodeType.note, forKey: .type)
             try container.encode(note, forKey: .note)
+        case .separator(let separator):
+            try container.encode(NodeType.separator, forKey: .type)
+            try container.encode(separator, forKey: .separator)
         }
     }
 }

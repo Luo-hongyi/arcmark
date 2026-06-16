@@ -596,13 +596,15 @@ final class ArcImportTests: XCTestCase {
         switch result {
         case .success(let importResult):
             XCTAssertEqual(importResult.linksImported, 2, "Fallback should find both links via parentID")
+            XCTAssertEqual(importResult.workspaces[0].nodes.map(\.displayName), ["Link One", "Link Two"])
         case .failure(let error):
             XCTFail("Import failed: \(error)")
         }
     }
 
-    func testContainerIDs_UnpinnedBeforePinned() async throws {
-        // Real Arc data puts "unpinned" BEFORE "pinned" in containerIDs
+    func testContainerIDs_ImportsPinnedAndUnpinned() async throws {
+        // Some Arc data puts "unpinned" before "pinned" in containerIDs.
+        // Arcmark should still import pinned links first, then unpinned sidebar tabs.
         let spaces = [
             createSpace(
                 id: "space1",
@@ -626,13 +628,19 @@ final class ArcImportTests: XCTestCase {
                 "childrenIds": [],
                 "data": ["tab": ["savedTitle": "Pinned", "savedURL": "https://pinned.com", "timeLastActiveAt": 1.0]]
             ],
-            // Unpinned item should NOT be imported
             [
                 "id": "unpinned-link",
                 "title": nil,
                 "parentID": "unpinned-ctr",
                 "childrenIds": [],
                 "data": ["tab": ["savedTitle": "Unpinned", "savedURL": "https://unpinned.com", "timeLastActiveAt": 1.0]]
+            ],
+            [
+                "id": "second-unpinned-link",
+                "title": nil,
+                "parentID": "unpinned-ctr",
+                "childrenIds": [],
+                "data": ["tab": ["savedTitle": "Second Unpinned", "savedURL": "https://second-unpinned.com", "timeLastActiveAt": 1.0]]
             ]
         ]
 
@@ -648,12 +656,21 @@ final class ArcImportTests: XCTestCase {
 
         switch result {
         case .success(let importResult):
-            XCTAssertEqual(importResult.linksImported, 1, "Should only import pinned link")
-            if case .link(let link) = importResult.workspaces[0].nodes.first {
-                XCTAssertEqual(link.title, "Pinned")
-            } else {
-                XCTFail("Expected pinned link")
-            }
+            XCTAssertEqual(importResult.linksImported, 3, "Should import pinned links and unpinned sidebar tabs")
+            XCTAssertEqual(importResult.workspaces[0].nodes.count, 4)
+            if case .link(let first) = importResult.workspaces[0].nodes[0] {
+                XCTAssertEqual(first.title, "Pinned")
+            } else { XCTFail("Expected pinned link first") }
+
+            XCTAssertTrue(importResult.workspaces[0].nodes[1].isSeparator)
+
+            if case .link(let second) = importResult.workspaces[0].nodes[2] {
+                XCTAssertEqual(second.title, "Unpinned")
+            } else { XCTFail("Expected unpinned link second") }
+
+            if case .link(let third) = importResult.workspaces[0].nodes[3] {
+                XCTAssertEqual(third.title, "Second Unpinned")
+            } else { XCTFail("Expected second unpinned link third") }
         case .failure(let error):
             XCTFail("Import failed: \(error)")
         }

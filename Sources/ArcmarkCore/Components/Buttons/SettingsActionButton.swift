@@ -10,8 +10,9 @@ final class SettingsActionButton: NSButton {
             .withAlphaComponent(ThemeConstants.Opacity.extraSubtle)
         static let textColor = ThemeConstants.Colors.darkGray
         static let disabledBackgroundColor = NSColor(
-            calibratedRed: 191.0/255.0, green: 193.0/255.0, blue: 195.0/255.0, alpha: 1.0)
+            calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.06)
         static let disabledTextColor = ThemeConstants.Colors.darkGray
+            .withAlphaComponent(ThemeConstants.Opacity.medium)
         static let cornerRadius = ThemeConstants.CornerRadius.medium
         nonisolated(unsafe) static let font = ThemeConstants.Fonts.systemFont(size: 13, weight: .regular)
         static let height: CGFloat = 36
@@ -21,8 +22,19 @@ final class SettingsActionButton: NSButton {
     private var spinner: NSProgressIndicator?
     private let originalTitle: String
     private(set) var isLoading: Bool = false
+    private var isActionEnabled = true
 
     func getIsLoading() -> Bool { isLoading }
+    func setActionEnabled(_ enabled: Bool) {
+        isActionEnabled = enabled
+        updateAppearance(isHovered: false)
+    }
+
+    override var isEnabled: Bool {
+        didSet {
+            updateAppearance(isHovered: false)
+        }
+    }
 
     init(title: String) {
         self.originalTitle = title
@@ -42,9 +54,8 @@ final class SettingsActionButton: NSButton {
         isBordered = false
         bezelStyle = .regularSquare
         font = Style.font
-        layer?.backgroundColor = Style.baseBackgroundColor.cgColor
         layer?.cornerRadius = Style.cornerRadius
-        updateTextColor(Style.textColor)
+        updateAppearance(isHovered: false)
     }
 
     private func updateTextColor(_ color: NSColor) {
@@ -52,7 +63,9 @@ final class SettingsActionButton: NSButton {
             .foregroundColor: color,
             .font: Style.font
         ]
-        attributedTitle = NSAttributedString(string: originalTitle, attributes: attributes)
+        let title = NSAttributedString(string: originalTitle, attributes: attributes)
+        attributedTitle = title
+        attributedAlternateTitle = title
     }
 
     func setLoading(_ loading: Bool) {
@@ -78,20 +91,18 @@ final class SettingsActionButton: NSButton {
                 spinner = progressIndicator
             }
 
-            layer?.backgroundColor = Style.disabledBackgroundColor.cgColor
-            updateTextColor(Style.disabledTextColor)
+            updateAppearance(isHovered: false)
             spinner?.startAnimation(nil)
             spinner?.isHidden = false
         } else {
             spinner?.stopAnimation(nil)
             spinner?.isHidden = true
-            layer?.backgroundColor = Style.baseBackgroundColor.cgColor
-            updateTextColor(Style.textColor)
+            updateAppearance(isHovered: false)
         }
     }
 
     override func mouseDown(with event: NSEvent) {
-        if isLoading { return }
+        if isLoading || !isEnabled || !isActionEnabled { return }
         super.mouseDown(with: event)
     }
 
@@ -107,17 +118,21 @@ final class SettingsActionButton: NSButton {
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        if !isLoading {
-            layer?.backgroundColor = Style.hoverBackgroundColor.cgColor
-        }
+        updateAppearance(isHovered: true)
     }
 
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        if isLoading {
+        updateAppearance(isHovered: false)
+    }
+
+    private func updateAppearance(isHovered: Bool) {
+        if isLoading || !isEnabled || !isActionEnabled {
             layer?.backgroundColor = Style.disabledBackgroundColor.cgColor
+            updateTextColor(Style.disabledTextColor)
         } else {
-            layer?.backgroundColor = Style.baseBackgroundColor.cgColor
+            layer?.backgroundColor = (isHovered ? Style.hoverBackgroundColor : Style.baseBackgroundColor).cgColor
+            updateTextColor(Style.textColor)
         }
     }
 

@@ -10,6 +10,8 @@ enum ScheduledLinkFiltering {
                 return link.scheduledOpenAt == nil ? node : nil
             case .note:
                 return node
+            case .separator:
+                return node
             case .folder(var folder):
                 folder.children = hideScheduled(folder.children)
                 return .folder(folder)

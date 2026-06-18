@@ -1125,6 +1125,12 @@ final class SettingsContentViewController: NSViewController {
     private func applyTabbitImport(_ result: TabbitImportResult) {
         guard let appModel = appModel else { return }
 
+        // Re-import REPLACES the Tabbit workspace's content entirely. We keep the same
+        // workspace id (if a "Tabbit" workspace already exists) so selection/identity is
+        // stable, but we discard the old items AND pinnedLinks — otherwise repeated imports
+        // would accumulate stale pinned tabs / links. Other workspaces are untouched.
+        // browserProfiles is preserved because it reflects a per-browser setting the user
+        // may have configured for this workspace, unrelated to imported content.
         let existingWorkspace = appModel.workspaces.first { $0.name == result.workspace.name }
         let tabbitWorkspace = Workspace(
             id: existingWorkspace?.id ?? UUID(),
@@ -1132,7 +1138,7 @@ final class SettingsContentViewController: NSViewController {
             colorId: result.workspace.colorId,
             customIcon: result.workspace.customIcon,
             items: result.workspace.nodes,
-            pinnedLinks: existingWorkspace?.pinnedLinks ?? [],
+            pinnedLinks: [],
             browserProfiles: existingWorkspace?.browserProfiles ?? [:]
         )
 

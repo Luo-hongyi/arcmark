@@ -147,3 +147,10 @@
 
 ### 2026-06-18 — 任务 5 空搜索状态视图 ⏭ 跳过
 - 作者决定不做，跳过。
+
+### 2026-06-18 — 计划外：Tabbit import 累加问题 ✅
+- 现象：重复 import Tabbit，内容累加 / 数量不对。
+- 根因（解析层）：Chromium session 是追加式日志，同一 group（cmd 27）会被多次写入；`extractGroups` 原遍历全部 cmd 27 未去重，导致同 group 产出多个 folder。
+- 修复（解析层）：`extractGroups` 按 group token 去重，仅取每个 group 首次出现。
+- 修复（apply 层）：`applyTabbitImport` 每次重置 Tabbit workspace 的 items + pinnedLinks（不保留旧），`browserProfiles` 保留，其它 workspace 不动。
+- 作者实测通过：folder 数与 Tabbit 当前 group 一致（待办任务/每天闻读/X平台浏览/GEO/Jobs/百度OCR），不累加。

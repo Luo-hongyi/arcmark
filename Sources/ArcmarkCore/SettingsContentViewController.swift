@@ -53,6 +53,7 @@ final class SettingsContentViewController: NSViewController {
 
     // Import & Export section
     private let importButton = SettingsActionButton(title: "Import from Arc Browser")
+    private let tabbitImportButton = SettingsActionButton(title: "Import from Tabbit Pages")
     private let chromeImportButton = SettingsActionButton(title: "Import from Chrome, Safari, Firefox")
     private let chromeHelpContainer = NSView()
     private let chromeHelpButton = CustomTextButton(title: "How to export bookmarks from your browser")
@@ -315,6 +316,10 @@ final class SettingsContentViewController: NSViewController {
         importButton.action = #selector(importFromArc)
         importButton.translatesAutoresizingMaskIntoConstraints = false
 
+        tabbitImportButton.target = self
+        tabbitImportButton.action = #selector(importFromTabbit)
+        tabbitImportButton.translatesAutoresizingMaskIntoConstraints = false
+
         chromeImportButton.target = self
         chromeImportButton.action = #selector(importFromChrome)
         chromeImportButton.translatesAutoresizingMaskIntoConstraints = false
@@ -401,6 +406,7 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(separatorSync)
         contentView.addSubview(importHeader)
         contentView.addSubview(importButton)
+        contentView.addSubview(tabbitImportButton)
         contentView.addSubview(chromeImportButton)
         contentView.addSubview(chromeHelpContainer)
         contentView.addSubview(importStatusLabel)
@@ -566,9 +572,15 @@ final class SettingsContentViewController: NSViewController {
             importButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             importButton.heightAnchor.constraint(equalToConstant: 36),
 
-            // Chrome Import Button (below Arc import button)
+            // Tabbit Import Button (below Arc import button)
+            tabbitImportButton.leadingAnchor.constraint(equalTo: importButton.leadingAnchor),
+            tabbitImportButton.topAnchor.constraint(equalTo: importButton.bottomAnchor, constant: itemSpacing),
+            tabbitImportButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            tabbitImportButton.heightAnchor.constraint(equalToConstant: 36),
+
+            // Chrome Import Button (below Tabbit import button)
             chromeImportButton.leadingAnchor.constraint(equalTo: importButton.leadingAnchor),
-            chromeImportButton.topAnchor.constraint(equalTo: importButton.bottomAnchor, constant: itemSpacing),
+            chromeImportButton.topAnchor.constraint(equalTo: tabbitImportButton.bottomAnchor, constant: itemSpacing),
             chromeImportButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             chromeImportButton.heightAnchor.constraint(equalToConstant: 36),
 
@@ -771,6 +783,10 @@ final class SettingsContentViewController: NSViewController {
         importButton.alphaValue = 1.0
         importButton.toolTip = canWriteSharedData ? nil : "READONLY mode disables importing on this device."
 
+        tabbitImportButton.setActionEnabled(canWriteSharedData)
+        tabbitImportButton.alphaValue = 1.0
+        tabbitImportButton.toolTip = canWriteSharedData ? nil : "READONLY mode disables importing on this device."
+
         chromeImportButton.setActionEnabled(false)
         chromeImportButton.alphaValue = 1.0
         chromeImportButton.toolTip = "Unavailable"
@@ -937,7 +953,7 @@ final class SettingsContentViewController: NSViewController {
         }
 
         // Guard against concurrent imports
-        if importButton.getIsLoading() || chromeImportButton.getIsLoading() {
+        if importButton.getIsLoading() || tabbitImportButton.getIsLoading() || chromeImportButton.getIsLoading() {
             return
         }
 
@@ -959,6 +975,54 @@ final class SettingsContentViewController: NSViewController {
 
     @objc private func importFromChrome() {
         showImportStatus("This importer is unavailable.", isError: true)
+    }
+
+    @objc private func importFromTabbit() {
+        guard appModel?.canWriteSharedData ?? SyncRole.current.canWriteICloud else {
+            showImportStatus("READONLY mode disables importing on this device.", isError: true)
+            return
+        }
+
+        if importButton.getIsLoading() || tabbitImportButton.getIsLoading() || chromeImportButton.getIsLoading() {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            await self?.handleTabbitImport()
+        }
+    }
+
+    private func handleTabbitImport() async {
+        tabbitImportButton.setLoading(true)
+        showImportStatus("Importing from Tabbit...", isError: false)
+
+        let result = await TabbitImportService.shared.importFromDefaultProfile()
+
+        tabbitImportButton.setLoading(false)
+
+        switch result {
+        case .success(let importResult):
+            guard appModel?.canWriteSharedData ?? false else {
+                showImportStatus("READONLY mode disables importing on this device.", isError: true)
+                return
+            }
+
+            applyTabbitImport(importResult)
+
+            let message = """
+            Successfully imported Tabbit pages:
+            • \(importResult.groupsImported) groups
+            • \(importResult.linksImported) pages
+            """
+            showImportStatus(message, isError: false)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                self?.hideImportStatus()
+            }
+
+        case .failure(let error):
+            showImportStatus(error.localizedDescription, isError: true)
+        }
     }
 
     private func handleChromeImport(fileURL: URL) async {
@@ -1015,6 +1079,27 @@ final class SettingsContentViewController: NSViewController {
         // The new workspace is already selected; when the user leaves settings they'll see it.
 
         // Reload the workspace list
+        reloadWorkspaces()
+    }
+
+    private func applyTabbitImport(_ result: TabbitImportResult) {
+        guard let appModel = appModel else { return }
+
+        let existingWorkspace = appModel.workspaces.first { $0.name == result.workspace.name }
+        let tabbitWorkspace = Workspace(
+            id: existingWorkspace?.id ?? UUID(),
+            name: result.workspace.name,
+            colorId: result.workspace.colorId,
+            customIcon: result.workspace.customIcon,
+            items: result.workspace.nodes,
+            pinnedLinks: existingWorkspace?.pinnedLinks ?? [],
+            browserProfiles: existingWorkspace?.browserProfiles ?? [:]
+        )
+
+        var workspaces = appModel.workspaces.filter { $0.name != result.workspace.name }
+        workspaces.append(tabbitWorkspace)
+        appModel.replaceAllWorkspaces(with: workspaces)
+
         reloadWorkspaces()
     }
 

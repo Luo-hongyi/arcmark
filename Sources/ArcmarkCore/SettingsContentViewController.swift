@@ -26,6 +26,7 @@ final class SettingsContentViewController: NSViewController {
 
     // Window settings section - custom components
     private let alwaysOnTopToggle = CustomToggle(title: "Always on Top")
+    private let appearanceToggle = CustomToggle(title: "Dark Mode")
     private let attachSidebarToggle = CustomToggle(title: "Attach to Window as Sidebar")
     private let sidebarPositionSelector = SidebarPositionSelector()
 
@@ -221,6 +222,10 @@ final class SettingsContentViewController: NSViewController {
         alwaysOnTopToggle.action = #selector(alwaysOnTopChanged)
         alwaysOnTopToggle.translatesAutoresizingMaskIntoConstraints = false
 
+        appearanceToggle.target = self
+        appearanceToggle.action = #selector(appearanceChanged)
+        appearanceToggle.translatesAutoresizingMaskIntoConstraints = false
+
         attachSidebarToggle.target = self
         attachSidebarToggle.action = #selector(attachSidebarChanged)
         attachSidebarToggle.translatesAutoresizingMaskIntoConstraints = false
@@ -379,6 +384,7 @@ final class SettingsContentViewController: NSViewController {
         // Add all subviews to contentView
         contentView.addSubview(windowSettingsHeader)
         contentView.addSubview(alwaysOnTopToggle)
+        contentView.addSubview(appearanceToggle)
         contentView.addSubview(attachSidebarToggle)
         contentView.addSubview(sidebarPositionSelector)
         contentView.addSubview(separator1)
@@ -433,9 +439,15 @@ final class SettingsContentViewController: NSViewController {
             alwaysOnTopToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             alwaysOnTopToggle.heightAnchor.constraint(equalToConstant: 28),
 
+            // Appearance (Dark Mode) Toggle
+            appearanceToggle.leadingAnchor.constraint(equalTo: alwaysOnTopToggle.leadingAnchor),
+            appearanceToggle.topAnchor.constraint(equalTo: alwaysOnTopToggle.bottomAnchor, constant: itemSpacing),
+            appearanceToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            appearanceToggle.heightAnchor.constraint(equalToConstant: 28),
+
             // Attach Sidebar Toggle
-            attachSidebarToggle.leadingAnchor.constraint(equalTo: alwaysOnTopToggle.leadingAnchor),
-            attachSidebarToggle.topAnchor.constraint(equalTo: alwaysOnTopToggle.bottomAnchor, constant: itemSpacing),
+            attachSidebarToggle.leadingAnchor.constraint(equalTo: appearanceToggle.leadingAnchor),
+            attachSidebarToggle.topAnchor.constraint(equalTo: appearanceToggle.bottomAnchor, constant: itemSpacing),
             attachSidebarToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             attachSidebarToggle.heightAnchor.constraint(equalToConstant: 28),
 
@@ -649,6 +661,9 @@ final class SettingsContentViewController: NSViewController {
         let alwaysOnTopEnabled = UserDefaults.standard.bool(forKey: UserDefaultsKeys.alwaysOnTopEnabled)
         alwaysOnTopToggle.isOn = alwaysOnTopEnabled
 
+        // Load Appearance (Dark Mode) preference. On = dark, Off = light (default).
+        appearanceToggle.isOn = (AppearancePreference.current == .dark)
+
         // Load Attach to Sidebar state
         let attachmentEnabled = UserDefaults.standard.bool(forKey: UserDefaultsKeys.sidebarAttachmentEnabled)
         attachSidebarToggle.isOn = attachmentEnabled
@@ -827,6 +842,12 @@ final class SettingsContentViewController: NSViewController {
         NotificationCenter.default.post(name: .alwaysOnTopSettingChanged, object: nil, userInfo: ["enabled": enabled])
 
         updateControlStates()
+    }
+
+    @objc private func appearanceChanged() {
+        // Toggle is "Dark Mode": on = dark, off = light.
+        let preference: AppearancePreference = appearanceToggle.isOn ? .dark : .light
+        AppearancePreference.current = preference
     }
 
     @objc private func attachSidebarChanged() {

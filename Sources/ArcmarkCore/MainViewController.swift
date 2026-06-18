@@ -42,7 +42,6 @@ final class MainViewController: NSViewController {
     private var isSwipeAnimating = false
     private var suppressNodeAnimations = false          // Suppresses collection view animations during swipe transitions
     private var swipeColorAnimationFromColor: NSColor?  // Set before workspace switch to trigger animated color transition
-    private var appearanceObservation: NSKeyValueObservation?
 
     init(model: AppModel) {
         self.model = model
@@ -103,12 +102,15 @@ final class MainViewController: NSViewController {
             object: nil
         )
 
-        // Re-apply dynamic colors when the system appearance changes (light ↔ dark).
-        appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
-            MainActor.assumeIsolated {
-                self?.handleEffectiveAppearanceChanged()
-            }
-        }
+        // Re-apply dynamic colors when the user changes the appearance preference
+        // (light ↔ dark). The window's NSAppearance is forced by AppDelegate; this fires
+        // the cached-CGColor refresh so hover/selected/shadow backgrounds follow.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleEffectiveAppearanceChanged),
+            name: .appearancePreferenceChanged,
+            object: nil
+        )
     }
 
     // MARK: - Setup

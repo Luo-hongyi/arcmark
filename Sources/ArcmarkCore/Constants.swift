@@ -4,6 +4,7 @@ import Foundation
 extension Notification.Name {
     static let defaultBrowserChanged = Notification.Name("defaultBrowserChanged")
     static let syncRoleChanged = Notification.Name("syncRoleChanged")
+    static let appearancePreferenceChanged = Notification.Name("appearancePreferenceChanged")
 }
 
 enum UserDefaultsKeys {
@@ -19,6 +20,36 @@ enum UserDefaultsKeys {
     static let tooltipsEnabled = "tooltipsEnabled"
     static let swipeToSwitchEnabled = "swipeToSwitchEnabled"
     static let syncRole = "syncRole"
+    static let appearancePreference = "appearancePreference"
+}
+
+/// User-selected app appearance. There is no "follow system" option by design — the
+/// user explicitly picks light or dark (default: light).
+enum AppearancePreference: String {
+    case light
+    case dark
+
+    static var current: AppearancePreference {
+        get {
+            guard let rawValue = UserDefaults.standard.string(forKey: UserDefaultsKeys.appearancePreference),
+                  let pref = AppearancePreference(rawValue: rawValue) else {
+                return .light
+            }
+            return pref
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: UserDefaultsKeys.appearancePreference)
+            NotificationCenter.default.post(name: .appearancePreferenceChanged, object: nil, userInfo: ["preference": newValue])
+        }
+    }
+
+    /// The `NSAppearance` to force on the window for this preference.
+    var nsAppearance: NSAppearance {
+        switch self {
+        case .light: return NSAppearance(named: .aqua)!
+        case .dark: return NSAppearance(named: .darkAqua)!
+        }
+    }
 }
 
 enum SyncRole: String {

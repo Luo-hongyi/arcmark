@@ -25,7 +25,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     public func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: [
             UserDefaultsKeys.tooltipsEnabled: true,
-            UserDefaultsKeys.syncRole: SyncRole.secondary.rawValue
+            UserDefaultsKeys.syncRole: SyncRole.secondary.rawValue,
+            UserDefaultsKeys.appearancePreference: AppearancePreference.light.rawValue
         ])
 
         updaterController = SPUStandardUpdaterController(
@@ -68,6 +69,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         if !restoredFrame {
             window.center()
         }
+        // Force the user-chosen appearance (light/dark). No "follow system" by design.
+        window.appearance = AppearancePreference.current.nsAppearance
         ensureWindowVisible(window)
         window.delegate = self
         window.makeKeyAndOrderFront(nil)
@@ -502,6 +505,18 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             name: .swipeToSwitchSettingChanged,
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppearancePreferenceChanged(_:)),
+            name: .appearancePreferenceChanged,
+            object: nil
+        )
+    }
+
+    @objc private func handleAppearancePreferenceChanged(_ notification: Notification) {
+        let pref = (notification.userInfo?["preference"] as? AppearancePreference) ?? AppearancePreference.current
+        window?.appearance = pref.nsAppearance
     }
 
     @objc private func handleBrowserChanged(_ notification: Notification) {

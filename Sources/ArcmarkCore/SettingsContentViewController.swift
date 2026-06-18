@@ -15,9 +15,9 @@ final class SettingsContentViewController: NSViewController {
     private let itemSpacing: CGFloat = 8           // Distance between items within a section
     private let controlLabelSpacing: CGFloat = 4    // Distance between label and control
 
-    // Color constants
-    private let sectionHeaderColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.5)
-    private let regularTextColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0)
+    // Color constants — derived from the dynamic darkGray so they follow the system appearance.
+    private let sectionHeaderColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.medium)
+    private let regularTextColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.full)
 
     // Browser section
     private let browserPopupContainer = NSView()
@@ -267,7 +267,7 @@ final class SettingsContentViewController: NSViewController {
         // Browser popup container with styled background
         browserPopupContainer.translatesAutoresizingMaskIntoConstraints = false
         browserPopupContainer.wantsLayer = true
-        browserPopupContainer.layer?.backgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.08).cgColor
+        browserPopupContainer.layer?.backgroundColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.extraSubtle).cgColor
         browserPopupContainer.layer?.cornerRadius = 8
 
         browserPopup.translatesAutoresizingMaskIntoConstraints = false
@@ -279,7 +279,7 @@ final class SettingsContentViewController: NSViewController {
 
         // Set content tint color for the chevron arrow
         if #available(macOS 14.0, *) {
-            browserPopup.contentTintColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.80)
+            browserPopup.contentTintColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.high)
         }
 
         let separator3 = createSeparator()

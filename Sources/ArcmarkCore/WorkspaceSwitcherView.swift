@@ -85,10 +85,12 @@ final class WorkspaceSwitcherView: NSView {
     }
 
     /// Re-applies dynamic colors after an effective-appearance change (light ↔ dark).
-    /// Triggers a rebuild so cached `cgColor` values on buttons/circles are re-resolved.
+    /// Triggers a rebuild so cached `cgColor` values on buttons/circles/shadow gradients
+    /// are re-resolved.
     func refreshAppearance() {
         applyStyle()
         rebuildButtons()
+        updateShadows()
         updateSelection()
     }
 
@@ -317,8 +319,10 @@ final class WorkspaceSwitcherView: NSView {
         let canScrollLeft = visibleRect.origin.x > 0
         let canScrollRight = visibleRect.origin.x + visibleRect.width < contentWidth
 
-        // Create gradients based on workspace color
-        let baseColor = workspaceColor.color
+        // Build gradients from the resolved workspace background so the fade matches the
+        // actual chrome color in both light and dark mode (`.color` is a hard-coded swatch;
+        // `.backgroundColor` is dynamic and is what the window/view actually paint with).
+        let baseColor = workspaceColor.backgroundColor
 
         let shadowOpacity = ThemeConstants.Opacity.high
 

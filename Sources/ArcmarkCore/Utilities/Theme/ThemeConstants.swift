@@ -96,13 +96,27 @@ struct ThemeConstants {
     enum Appearance {
         /// Returns `true` when the effective appearance is a dark variant.
         ///
+        /// Since the app now uses **manual** appearance control (no "follow system"), the
+        /// user's `AppearancePreference` is the authoritative source of truth.
+        ///
         /// Resolution order:
-        /// 1. The user's explicit `AppearancePreference` (the app forces window.appearance to
-        ///    match it, so this is the ground truth).
-        /// 2. The passed-in appearance (used by NSColor(name:) providers).
-        /// 3. `NSApp.effectiveAppearance`.
-        /// 4. Aqua (default to light).
+        /// 1. The user's explicit `AppearancePreference` (AppDelegate forces window.appearance
+        ///    to match it).
+        /// 2. The passed-in appearance (only used when no preference is set yet, e.g. very
+        ///    early launch or in unit tests that pass an explicit appearance).
+        ///
+        /// NOTE: We deliberately do NOT trust the `appearance` argument from `NSColor(name:)`
+        /// providers when a preference exists. When `NSAppearance.current` is unset (common in
+        /// non-draw call stacks like reload callbacks), AppKit passes a misleading appearance
+        /// to the provider that resolves to darkAqua, which would break light mode.
         static func isDark(_ appearance: NSAppearance? = nil) -> Bool {
+            // Preference is authoritative when set.
+            let raw = UserDefaults.standard.string(forKey: UserDefaultsKeys.appearancePreference)
+            if let raw, let pref = AppearancePreference(rawValue: raw) {
+                return pref == .dark
+            }
+            // No preference yet (first launch before register(defaults:)) — fall back to the
+            // explicit appearance, defaulting to light.
             if let appearance {
                 return appearance.bestMatch(from: [
                     .darkAqua,
@@ -111,9 +125,7 @@ struct ThemeConstants {
                     .accessibilityHighContrastVibrantDark
                 ]) != nil
             }
-            // No explicit appearance passed (e.g. resolving outside a draw context):
-            // the user preference is authoritative because AppDelegate forces window.appearance.
-            return AppearancePreference.current == .dark
+            return false
         }
 
         /// Creates a dynamic `NSColor` that switches between `light` and `dark` based on the

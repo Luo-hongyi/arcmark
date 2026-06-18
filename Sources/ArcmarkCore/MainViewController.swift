@@ -74,6 +74,12 @@ final class MainViewController: NSViewController {
     /// `NSViewController` has no `viewDidChangeEffectiveAppearance()` override point (that's
     /// `NSView`), so we observe the global effective-appearance did-change notification.
     @objc private func handleEffectiveAppearanceChanged() {
+        // The window background and root view layer background were resolved to a concrete
+        // CGColor at setup time; they don't follow NSColor dynamic wrappers automatically.
+        // Re-resolve them here so the chrome (titlebar area, resize corners) matches.
+        let bg = WorkspaceColorId.settingsBackground.backgroundColor
+        view.window?.backgroundColor = bg
+
         // Coalesce with any pending reload to avoid duplicate work.
         if isReloadScheduled { return }
         reloadData()

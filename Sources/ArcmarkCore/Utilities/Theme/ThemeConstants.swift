@@ -94,15 +94,26 @@ struct ThemeConstants {
 
     /// Appearance helpers for light/dark dynamic colors.
     enum Appearance {
-        /// Returns `true` when the given (or current) appearance resolves to a dark variant.
+        /// Returns `true` when the effective appearance is a dark variant.
+        ///
+        /// Resolution order:
+        /// 1. The user's explicit `AppearancePreference` (the app forces window.appearance to
+        ///    match it, so this is the ground truth).
+        /// 2. The passed-in appearance (used by NSColor(name:) providers).
+        /// 3. `NSApp.effectiveAppearance`.
+        /// 4. Aqua (default to light).
         static func isDark(_ appearance: NSAppearance? = nil) -> Bool {
-            let resolved = appearance ?? NSApp?.effectiveAppearance ?? NSAppearance(named: .aqua)
-            return resolved?.bestMatch(from: [
-                .darkAqua,
-                .vibrantDark,
-                .accessibilityHighContrastDarkAqua,
-                .accessibilityHighContrastVibrantDark
-            ]) != nil
+            if let appearance {
+                return appearance.bestMatch(from: [
+                    .darkAqua,
+                    .vibrantDark,
+                    .accessibilityHighContrastDarkAqua,
+                    .accessibilityHighContrastVibrantDark
+                ]) != nil
+            }
+            // No explicit appearance passed (e.g. resolving outside a draw context):
+            // the user preference is authoritative because AppDelegate forces window.appearance.
+            return AppearancePreference.current == .dark
         }
 
         /// Creates a dynamic `NSColor` that switches between `light` and `dark` based on the

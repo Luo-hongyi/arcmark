@@ -68,9 +68,14 @@ enum PlaceholderIconGenerator {
         // Disc color: the fully-saturated accent (`.color`), NOT the translucent
         // `.backgroundColor`. The background variant is meant for large surfaces blending
         // into the chrome (it's 0.92 alpha pastel in light / 18% accent in dark) — too pale
-        // under a white letter. Using the solid accent keeps the white letter legible in both
-        // light and dark mode.
+        // under a letter. Using the solid accent gives a consistent bright disc in both modes.
         let discColor = accentColor.color
+
+        // Letter color: dark. All 8 workspace accents are light pastels (luma 0.55–0.86),
+        // so a dark letter (contrast 12–18:1) is far more legible than white (contrast 1–2:1).
+        // The disc is always a bright pastel regardless of appearance, so the letter stays
+        // dark in both light and dark mode.
+        let letterColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.9)
 
         let image = NSImage(size: NSSize(width: size, height: size))
         image.lockFocus()
@@ -80,11 +85,11 @@ enum PlaceholderIconGenerator {
         discColor.setFill()
         NSBezierPath(ovalIn: rect).fill()
 
-        // Letter: white, bold, sized to ~60% of the disc, vertically centered.
+        // Letter: bold, sized to ~60% of the disc, vertically centered.
         let font = NSFont.systemFont(ofSize: size * 0.6, weight: .bold)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: NSColor.white
+            .foregroundColor: letterColor
         ]
         let str = NSString(string: letter)
         let glyphSize = str.size(withAttributes: attributes)

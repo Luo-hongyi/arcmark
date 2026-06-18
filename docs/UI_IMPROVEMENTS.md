@@ -111,3 +111,13 @@
 ## 进度记录
 
 （每完成一项，在此追加一行：日期 / 任务 / 结论）
+
+### 2026-06-18 — 任务 1 深色模式支持 ✅
+- `ThemeConstants.Colors` 的 `darkGray / white / settingsBackground` 改为 `NSColor(name:)` 动态色，新增 `windowBackground` 与 `Appearance` helper（`isDark` / `dynamicColor`）。
+- `ListMetrics` 的 hover/selected/title/delete/icon tint 改为浅色 black-derived、深色 white-derived。
+- `WorkspaceColorId.backgroundColor`：`.settingsBackground` 分支委托给动态的 `ThemeConstants.Colors.settingsBackground`；其余 8 色深色下做 18% accent 混合。
+- `MainViewController` 监听 `NSApp.effectiveAppearance`，切换时重设 `window.backgroundColor` 并 `reloadData()` + `workspaceSwitcher.refreshAppearance()`。
+- `WorkspaceSwitcherView.refreshAppearance()` 新增（含 `updateShadows()`），shadow 渐变改用动态的 `backgroundColor`。
+- 清理所有残留硬编码 `#141414`：`SettingsContentViewController`（section/regular text + popup）、`WorkspaceRowView.Style`（7 处）、`SettingsActionButton.disabledBackgroundColor`、`MainViewController.createColorPreviewImage`。
+- 测试：`ThemeConstantsTests` 改为在显式 appearance 下解析动态色并断言浅/深切换；新增 `testDarkGrayColorSwitchesWithAppearance`。`swift test` 全通过。
+- 作者实测：浅色/深色切换实时跟随，窗口背景、列表 hover/selected、Settings 文字、Manage Workspaces 行、顶部滚动渐变均正常。

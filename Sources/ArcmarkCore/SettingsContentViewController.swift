@@ -632,10 +632,11 @@ final class SettingsContentViewController: NSViewController {
 
         // Setup dynamic constraints for separator1.
         // separator1 always sits below appearanceToggle (the last visible item in the Window
-        // Settings section). The toggle/selector visibility no longer affects this anchor since
-        // appearanceToggle is always present.
-        separator1ToSelectorConstraint = separator1.topAnchor.constraint(equalTo: appearanceToggle.bottomAnchor, constant: sectionSpacing)
-        separator1ToToggleConstraint = separator1.topAnchor.constraint(equalTo: appearanceToggle.bottomAnchor, constant: sectionSpacing)
+        // Settings section). Use itemSpacing (intra-section) since appearanceToggle is still
+        // part of the Window Settings section; the section break is on the other side of the
+        // separator (separator1 → shortcutsHeader uses sectionSpacing).
+        separator1ToSelectorConstraint = separator1.topAnchor.constraint(equalTo: appearanceToggle.bottomAnchor, constant: itemSpacing)
+        separator1ToToggleConstraint = separator1.topAnchor.constraint(equalTo: appearanceToggle.bottomAnchor, constant: itemSpacing)
 
         // Activate the appropriate constraint based on initial state
         separator1ToSelectorConstraint?.isActive = true

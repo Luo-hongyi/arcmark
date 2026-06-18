@@ -439,15 +439,9 @@ final class SettingsContentViewController: NSViewController {
             alwaysOnTopToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             alwaysOnTopToggle.heightAnchor.constraint(equalToConstant: 28),
 
-            // Appearance (Dark Mode) Toggle
-            appearanceToggle.leadingAnchor.constraint(equalTo: alwaysOnTopToggle.leadingAnchor),
-            appearanceToggle.topAnchor.constraint(equalTo: alwaysOnTopToggle.bottomAnchor, constant: itemSpacing),
-            appearanceToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
-            appearanceToggle.heightAnchor.constraint(equalToConstant: 28),
-
             // Attach Sidebar Toggle
-            attachSidebarToggle.leadingAnchor.constraint(equalTo: appearanceToggle.leadingAnchor),
-            attachSidebarToggle.topAnchor.constraint(equalTo: appearanceToggle.bottomAnchor, constant: itemSpacing),
+            attachSidebarToggle.leadingAnchor.constraint(equalTo: alwaysOnTopToggle.leadingAnchor),
+            attachSidebarToggle.topAnchor.constraint(equalTo: alwaysOnTopToggle.bottomAnchor, constant: itemSpacing),
             attachSidebarToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             attachSidebarToggle.heightAnchor.constraint(equalToConstant: 28),
 
@@ -455,6 +449,12 @@ final class SettingsContentViewController: NSViewController {
             sidebarPositionSelector.leadingAnchor.constraint(equalTo: attachSidebarToggle.leadingAnchor),
             sidebarPositionSelector.topAnchor.constraint(equalTo: attachSidebarToggle.bottomAnchor, constant: itemSpacing),
             sidebarPositionSelector.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+
+            // Appearance (Dark Mode) Toggle
+            appearanceToggle.leadingAnchor.constraint(equalTo: sidebarPositionSelector.leadingAnchor),
+            appearanceToggle.topAnchor.constraint(equalTo: sidebarPositionSelector.bottomAnchor, constant: itemSpacing),
+            appearanceToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            appearanceToggle.heightAnchor.constraint(equalToConstant: 28),
 
             // Separator 1
             separator1.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
@@ -630,9 +630,12 @@ final class SettingsContentViewController: NSViewController {
             contentView.bottomAnchor.constraint(greaterThanOrEqualTo: checkForUpdatesButton.bottomAnchor, constant: 24),
         ])
 
-        // Setup dynamic constraints for separator1
-        separator1ToSelectorConstraint = separator1.topAnchor.constraint(equalTo: sidebarPositionSelector.bottomAnchor, constant: sectionSpacing)
-        separator1ToToggleConstraint = separator1.topAnchor.constraint(equalTo: attachSidebarToggle.bottomAnchor, constant: sectionSpacing)
+        // Setup dynamic constraints for separator1.
+        // separator1 always sits below appearanceToggle (the last visible item in the Window
+        // Settings section). The toggle/selector visibility no longer affects this anchor since
+        // appearanceToggle is always present.
+        separator1ToSelectorConstraint = separator1.topAnchor.constraint(equalTo: appearanceToggle.bottomAnchor, constant: sectionSpacing)
+        separator1ToToggleConstraint = separator1.topAnchor.constraint(equalTo: appearanceToggle.bottomAnchor, constant: sectionSpacing)
 
         // Activate the appropriate constraint based on initial state
         separator1ToSelectorConstraint?.isActive = true

@@ -65,10 +65,12 @@ enum PlaceholderIconGenerator {
                       size: CGFloat) -> NSImage? {
         guard let letter = initial(for: urlString) else { return nil }
 
-        // Disc color: light mode uses the accent at 0.85 alpha; dark mode blends 18% of
-        // the accent into the deep window background — same strategy as
-        // `WorkspaceColorId.backgroundColor`, so placeholders sit naturally on the chrome.
-        let discColor = accentColor.backgroundColor
+        // Disc color: the fully-saturated accent (`.color`), NOT the translucent
+        // `.backgroundColor`. The background variant is meant for large surfaces blending
+        // into the chrome (it's 0.92 alpha pastel in light / 18% accent in dark) — too pale
+        // under a white letter. Using the solid accent keeps the white letter legible in both
+        // light and dark mode.
+        let discColor = accentColor.color
 
         let image = NSImage(size: NSSize(width: size, height: size))
         image.lockFocus()

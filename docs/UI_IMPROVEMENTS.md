@@ -138,3 +138,6 @@
 - `SettingsContentViewController` 加 "Dark Mode" CustomToggle，位于 Attach Sidebar / Position selector 下方；用动态约束避免 selector 隐藏时产生空隙。
 - 关键 bug 修复：`isDark()` 无条件优先读 `AppearancePreference`。根因——当 `NSAppearance.current` 未设置（reload 回调等非 draw 上下文），AppKit 给 `NSColor(name:)` provider 传入的 appearance 会被错误解析成 darkAqua，导致浅色模式背景变深。改为以用户偏好为唯一真相后，resolve 在任何上下文都确定且正确。
 - 作者实测通过：浅色窗口背景正确、toggle 位置正确、重启记住选择、切换系统外观不受影响。
+
+### 2026-06-18 — 任务 3 列表键盘导航 ⏭ 跳过
+- 作者决定不做，跳过。

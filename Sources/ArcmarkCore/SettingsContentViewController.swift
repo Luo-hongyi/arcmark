@@ -86,6 +86,10 @@ final class SettingsContentViewController: NSViewController {
     // Dynamic constraints
     private var separator1ToSelectorConstraint: NSLayoutConstraint?
     private var separator1ToToggleConstraint: NSLayoutConstraint?
+    // Dark Mode toggle sits below either the position selector (when sidebar attach is on)
+    // or directly below the Attach toggle (when the selector is hidden), to avoid a gap.
+    private var appearanceToSelectorConstraint: NSLayoutConstraint?
+    private var appearanceToToggleConstraint: NSLayoutConstraint?
     private var separator4ToOpenSettingsConstraint: NSLayoutConstraint?
     private var separator4ToRefreshButtonConstraint: NSLayoutConstraint?
     private var separator5ToChromeHelpButtonConstraint: NSLayoutConstraint?
@@ -451,8 +455,7 @@ final class SettingsContentViewController: NSViewController {
             sidebarPositionSelector.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
 
             // Appearance (Dark Mode) Toggle
-            appearanceToggle.leadingAnchor.constraint(equalTo: sidebarPositionSelector.leadingAnchor),
-            appearanceToggle.topAnchor.constraint(equalTo: sidebarPositionSelector.bottomAnchor, constant: itemSpacing),
+            appearanceToggle.leadingAnchor.constraint(equalTo: attachSidebarToggle.leadingAnchor),
             appearanceToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             appearanceToggle.heightAnchor.constraint(equalToConstant: 28),
 
@@ -638,8 +641,14 @@ final class SettingsContentViewController: NSViewController {
         separator1ToSelectorConstraint = separator1.topAnchor.constraint(equalTo: appearanceToggle.bottomAnchor, constant: itemSpacing)
         separator1ToToggleConstraint = separator1.topAnchor.constraint(equalTo: appearanceToggle.bottomAnchor, constant: itemSpacing)
 
+        // Dark Mode toggle: anchor to the position selector when it's visible, otherwise
+        // directly to the Attach toggle so there's no gap when the selector is hidden.
+        appearanceToSelectorConstraint = appearanceToggle.topAnchor.constraint(equalTo: sidebarPositionSelector.bottomAnchor, constant: itemSpacing)
+        appearanceToToggleConstraint = appearanceToggle.topAnchor.constraint(equalTo: attachSidebarToggle.bottomAnchor, constant: itemSpacing)
+
         // Activate the appropriate constraint based on initial state
         separator1ToSelectorConstraint?.isActive = true
+        appearanceToSelectorConstraint?.isActive = true
 
         // Setup dynamic constraints for separator4 (permissions section)
         // openSettingsButton is shown/hidden based on accessibility permission status
@@ -792,9 +801,13 @@ final class SettingsContentViewController: NSViewController {
         if shouldShowSidebarPosition {
             separator1ToToggleConstraint?.isActive = false
             separator1ToSelectorConstraint?.isActive = true
+            appearanceToToggleConstraint?.isActive = false
+            appearanceToSelectorConstraint?.isActive = true
         } else {
             separator1ToSelectorConstraint?.isActive = false
             separator1ToToggleConstraint?.isActive = true
+            appearanceToSelectorConstraint?.isActive = false
+            appearanceToToggleConstraint?.isActive = true
         }
 
         let canWriteSharedData = appModel?.canWriteSharedData ?? SyncRole.current.canWriteICloud

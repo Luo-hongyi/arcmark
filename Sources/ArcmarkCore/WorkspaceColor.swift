@@ -41,7 +41,9 @@ enum WorkspaceColorId: String, Codable {
 
     var backgroundColor: NSColor {
         if self == .settingsBackground {
-            return color
+            // Delegates to the dynamic ThemeConstants color so the app/Settings chrome
+            // follows the system appearance (light #E5E7EB / dark #1E1E1E).
+            return ThemeConstants.Colors.settingsBackground
         }
         // Light: a soft tint at 0.92 alpha over the window.
         // Dark:  blend 18% of the accent into the deep window background, so dark mode shows

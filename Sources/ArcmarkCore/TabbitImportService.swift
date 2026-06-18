@@ -195,7 +195,14 @@ final class TabbitImportService: Sendable {
             }
         }
 
-        return groupMetadata.compactMap { group in
+        return groupMetadata.enumerated().compactMap { index, group -> TabbitGroup? in
+            // Chromium session files are append-only logs, so the same group (cmd 27) may
+            // appear multiple times. Deduplicate by token: only the first occurrence yields a
+            // folder, otherwise the same tabs would be imported repeatedly ("accumulation").
+            if groupMetadata.firstIndex(where: { $0.token == group.token }) != index {
+                return nil
+            }
+
             let tabs = groupTokenByTab.compactMap { tabId, groupToken -> TabbitTab? in
                 guard groupToken == group.token,
                       let navigations = navigationsByTab[tabId],

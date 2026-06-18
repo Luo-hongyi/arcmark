@@ -121,3 +121,24 @@
 - 清理所有残留硬编码 `#141414`：`SettingsContentViewController`（section/regular text + popup）、`WorkspaceRowView.Style`（7 处）、`SettingsActionButton.disabledBackgroundColor`、`MainViewController.createColorPreviewImage`。
 - 测试：`ThemeConstantsTests` 改为在显式 appearance 下解析动态色并断言浅/深切换；新增 `testDarkGrayColorSwitchesWithAppearance`。`swift test` 全通过。
 - 作者实测：浅色/深色切换实时跟随，窗口背景、列表 hover/selected、Settings 文字、Manage Workspaces 行、顶部滚动渐变均正常。
+
+### 2026-06-18 — 任务 2 Favicon 占位符 ✅
+- 新增 `PlaceholderIconGenerator`：提取域名首字母（去 `www.`、大写、仅字母；IP/localhost/非 ASCII 退回 nil），渲染彩色圆盘 + 白字；圆盘色用 `WorkspaceColorId.backgroundColor`（动态，深色跟随）。
+- 三处调用点（`NodeListViewController` / `PinnedTabTileView` / `ScheduledLinkRowView`）改为先占位符、不行再 globe 兜底。
+- accentColor 从 `MainViewController` 经 `PinnedTabsView.update(accentColor:)` / `ScheduledLinksAccordionView.update(accentColor:)` 透传到各 row。
+- 新增 11 个单元测试，覆盖首字母提取与图像渲染（含 8 色）。`swift test` 全通过。
+- 作者实测通过。
+
+### 2026-06-18 — 计划外：浅色/深色手动切换（Settings）
+- 背景：任务 1 默认"跟随系统"，作者希望改为用户手动选择，默认浅色，无"跟随系统"选项。
+- 状态：待实施（见下方独立方案）。
+
+### 2026-06-18 — 任务 1 深色模式支持 ✅
+- `ThemeConstants.Colors` 的 `darkGray / white / settingsBackground` 改为 `NSColor(name:)` 动态色，新增 `windowBackground` 与 `Appearance` helper（`isDark` / `dynamicColor`）。
+- `ListMetrics` 的 hover/selected/title/delete/icon tint 改为浅色 black-derived、深色 white-derived。
+- `WorkspaceColorId.backgroundColor`：`.settingsBackground` 分支委托给动态的 `ThemeConstants.Colors.settingsBackground`；其余 8 色深色下做 18% accent 混合。
+- `MainViewController` 监听 `NSApp.effectiveAppearance`，切换时重设 `window.backgroundColor` 并 `reloadData()` + `workspaceSwitcher.refreshAppearance()`。
+- `WorkspaceSwitcherView.refreshAppearance()` 新增（含 `updateShadows()`），shadow 渐变改用动态的 `backgroundColor`。
+- 清理所有残留硬编码 `#141414`：`SettingsContentViewController`（section/regular text + popup）、`WorkspaceRowView.Style`（7 处）、`SettingsActionButton.disabledBackgroundColor`、`MainViewController.createColorPreviewImage`。
+- 测试：`ThemeConstantsTests` 改为在显式 appearance 下解析动态色并断言浅/深切换；新增 `testDarkGrayColorSwitchesWithAppearance`。`swift test` 全通过。
+- 作者实测：浅色/深色切换实时跟随，窗口背景、列表 hover/selected、Settings 文字、Manage Workspaces 行、顶部滚动渐变均正常。

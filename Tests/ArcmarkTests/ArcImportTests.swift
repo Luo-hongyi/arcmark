@@ -28,12 +28,25 @@ final class ArcImportTests: XCTestCase {
     }
 
     /// Creates a test space with optional title
-    private func createSpace(id: String = "space1", title: String?, containerIDs: [String] = ["pinned", "container1"]) -> [String: Any?] {
-        return [
+    private func createSpace(
+        id: String = "space1",
+        title: String?,
+        containerIDs: [String] = ["pinned", "container1"],
+        iconEmoji: String? = nil
+    ) -> [String: Any?] {
+        var space: [String: Any?] = [
             "id": id,
             "title": title,
             "containerIDs": containerIDs
         ]
+        if let iconEmoji {
+            space["customInfo"] = [
+                "iconType": [
+                    "emoji_v2": iconEmoji
+                ]
+            ]
+        }
+        return space
     }
 
     /// Creates a test link item with optional title
@@ -671,6 +684,39 @@ final class ArcImportTests: XCTestCase {
             if case .link(let third) = importResult.workspaces[0].nodes[3] {
                 XCTAssertEqual(third.title, "Second Unpinned")
             } else { XCTFail("Expected second unpinned link third") }
+        case .failure(let error):
+            XCTFail("Import failed: \(error)")
+        }
+    }
+
+    func testImportsWorkspaceEmojiIcon() async throws {
+        let spaces = [
+            createSpace(id: "space1", title: "Trip", iconEmoji: "✈️")
+        ]
+
+        let items = [
+            createLinkItem(
+                id: "link1",
+                parentID: "container1",
+                savedTitle: "Flight",
+                savedURL: "https://flight.example"
+            )
+        ]
+
+        let jsonData = try createArcJSON(spaces: spaces, items: items)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("json")
+        try jsonData.write(to: tempURL)
+
+        let service = ArcImportService.shared
+        let result = await service.importFromArc(fileURL: tempURL)
+        try? FileManager.default.removeItem(at: tempURL)
+
+        switch result {
+        case .success(let importResult):
+            XCTAssertEqual(importResult.workspaces.count, 1)
+            XCTAssertEqual(importResult.workspaces[0].customIcon, .emoji("✈️"))
         case .failure(let error):
             XCTFail("Import failed: \(error)")
         }

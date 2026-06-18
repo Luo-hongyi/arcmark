@@ -1068,7 +1068,13 @@ final class SettingsContentViewController: NSViewController {
         guard let appModel = appModel else { return }
 
         let workspaces = result.workspaces.map { workspace in
-            Workspace(id: UUID(), name: workspace.name, colorId: workspace.colorId, items: workspace.nodes)
+            Workspace(
+                id: UUID(),
+                name: workspace.name,
+                colorId: workspace.colorId,
+                customIcon: workspace.customIcon,
+                items: workspace.nodes
+            )
         }
         appModel.replaceAllWorkspaces(with: workspaces)
 

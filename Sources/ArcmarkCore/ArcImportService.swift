@@ -99,6 +99,7 @@ enum ArcSpaceOrString: Codable {
 struct ArcSpace: Codable {
     let id: String
     let title: String?
+    let customInfo: ArcSpaceCustomInfo?
     let containerIDs: [String]
 
     var sidebarContainerIds: [String] {
@@ -116,6 +117,20 @@ struct ArcSpace: Codable {
             return nil
         }
         return containerIDs[index + 1]
+    }
+}
+
+struct ArcSpaceCustomInfo: Codable {
+    let iconType: ArcSpaceIconType?
+}
+
+struct ArcSpaceIconType: Codable {
+    let emojiV2: String?
+    let emoji: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case emojiV2 = "emoji_v2"
+        case emoji
     }
 }
 
@@ -176,6 +191,7 @@ struct ArcTabData: Codable {
 struct ImportWorkspace: Sendable {
     let name: String
     let colorId: WorkspaceColorId
+    let customIcon: CustomIcon?
     let nodes: [Node]
 }
 
@@ -354,6 +370,7 @@ final class ArcImportService: Sendable {
             let workspace = ImportWorkspace(
                 name: workspaceName,
                 colorId: colorId,
+                customIcon: customIcon(for: space),
                 nodes: nodes
             )
 
@@ -361,6 +378,20 @@ final class ArcImportService: Sendable {
         }
 
         return workspaces
+    }
+
+    private func customIcon(for space: ArcSpace) -> CustomIcon? {
+        if let emoji = space.customInfo?.iconType?.emojiV2,
+           !emoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .emoji(emoji)
+        }
+
+        if let scalarValue = space.customInfo?.iconType?.emoji,
+           let scalar = UnicodeScalar(scalarValue) {
+            return .emoji(String(Character(scalar)))
+        }
+
+        return nil
     }
 
     /// Build a map of item ID to item object

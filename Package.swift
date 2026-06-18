@@ -31,7 +31,12 @@ let package = Package(
         ),
         .testTarget(
             name: "ArcmarkTests",
-            dependencies: ["ArcmarkCore"]
+            dependencies: ["ArcmarkCore"],
+            exclude: [
+                "Components/Base/BaseControlTests.swift.skip",
+                "Components/Base/BaseViewTests.swift.skip",
+                "Components/Base/InlineEditableTextFieldTests.swift.skip"
+            ]
         )
     ]
 )

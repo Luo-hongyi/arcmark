@@ -26,16 +26,18 @@ struct Workspace: Codable, Identifiable, Equatable {
     var id: UUID
     var name: String
     var colorId: WorkspaceColorId
+    var customIcon: CustomIcon?
     var items: [Node]
     var pinnedLinks: [Link]
     var browserProfiles: [String: String]
 
     static let maxPinnedLinks = ThemeConstants.Sizing.pinnedTileColumns * ThemeConstants.Sizing.pinnedTileMaxRows
 
-    init(id: UUID, name: String, colorId: WorkspaceColorId, items: [Node], pinnedLinks: [Link] = [], browserProfiles: [String: String] = [:]) {
+    init(id: UUID, name: String, colorId: WorkspaceColorId, customIcon: CustomIcon? = nil, items: [Node], pinnedLinks: [Link] = [], browserProfiles: [String: String] = [:]) {
         self.id = id
         self.name = name
         self.colorId = colorId
+        self.customIcon = customIcon
         self.items = items
         self.pinnedLinks = pinnedLinks
         self.browserProfiles = browserProfiles
@@ -46,6 +48,7 @@ struct Workspace: Codable, Identifiable, Equatable {
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         colorId = try container.decode(WorkspaceColorId.self, forKey: .colorId)
+        customIcon = try container.decodeIfPresent(CustomIcon.self, forKey: .customIcon)
         items = try container.decode([Node].self, forKey: .items)
         pinnedLinks = try container.decodeIfPresent([Link].self, forKey: .pinnedLinks) ?? []
 
@@ -61,7 +64,7 @@ struct Workspace: Codable, Identifiable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, colorId, items, pinnedLinks, browserProfiles
+        case id, name, colorId, customIcon, items, pinnedLinks, browserProfiles
         // Legacy keys for backward compatibility decoding
         case browserProfile, browserProfileBundleId
     }
@@ -71,6 +74,7 @@ struct Workspace: Codable, Identifiable, Equatable {
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
         try container.encode(colorId, forKey: .colorId)
+        try container.encodeIfPresent(customIcon, forKey: .customIcon)
         try container.encode(items, forKey: .items)
         try container.encode(pinnedLinks, forKey: .pinnedLinks)
         try container.encode(browserProfiles, forKey: .browserProfiles)

@@ -459,7 +459,8 @@ final class MainViewController: NSViewController {
             WorkspaceSwitcherView.WorkspaceItem(
                 id: workspace.id,
                 name: workspace.name,
-                colorId: workspace.colorId
+                colorId: workspace.colorId,
+                customIcon: workspace.customIcon
             )
         }
 

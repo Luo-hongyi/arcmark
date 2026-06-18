@@ -100,11 +100,14 @@ final class WorkspaceRowView: BaseView {
 
     private let handleView = NSImageView()
     private let colorSquare = NSView()
+    private let iconView = EmojiIconView()
     private let editableTitle = InlineEditableTextField()
     private let profileIconView = NSImageView()
     private let setProfileButton: PaddedTextButton
     private let deleteButton = NSButton()
     private var style: Style = .default
+    private var iconWidthConstraint: NSLayoutConstraint?
+    private var iconHeightConstraint: NSLayoutConstraint?
     private var onDelete: (() -> Void)?
     private var onProfile: (() -> Void)?
     private var hasProfile: Bool = false
@@ -147,6 +150,12 @@ final class WorkspaceRowView: BaseView {
         colorSquare.layer?.masksToBounds = true
         colorSquare.layer?.borderWidth = style.colorSquareBorderWidth
         colorSquare.layer?.borderColor = style.colorSquareBorderColor.cgColor
+
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.pointSize = style.colorSquareSize
+        iconView.isHidden = true
+        iconView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        iconView.setContentHuggingPriority(.required, for: .horizontal)
 
         // Title field
         editableTitle.translatesAutoresizingMaskIntoConstraints = false
@@ -195,10 +204,16 @@ final class WorkspaceRowView: BaseView {
 
         addSubview(handleView)
         addSubview(colorSquare)
+        addSubview(iconView)
         addSubview(editableTitle)
         addSubview(profileIconView)
         addSubview(setProfileButton)
         addSubview(deleteButton)
+
+        let iconWidthConstraint = iconView.widthAnchor.constraint(equalToConstant: style.colorSquareSize)
+        let iconHeightConstraint = iconView.heightAnchor.constraint(equalToConstant: style.colorSquareSize)
+        self.iconWidthConstraint = iconWidthConstraint
+        self.iconHeightConstraint = iconHeightConstraint
 
         // Three mutually exclusive title trailing constraints
         titleTrailingToEdge = editableTitle.trailingAnchor.constraint(
@@ -221,8 +236,13 @@ final class WorkspaceRowView: BaseView {
             colorSquare.widthAnchor.constraint(equalToConstant: style.colorSquareSize),
             colorSquare.heightAnchor.constraint(equalToConstant: style.colorSquareSize),
 
+            iconView.centerXAnchor.constraint(equalTo: colorSquare.centerXAnchor),
+            iconView.centerYAnchor.constraint(equalTo: colorSquare.centerYAnchor),
+            iconWidthConstraint,
+            iconHeightConstraint,
+
             // Title (leading + center only, trailing is dynamic)
-            editableTitle.leadingAnchor.constraint(equalTo: colorSquare.trailingAnchor, constant: style.titleLeading),
+            editableTitle.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: style.titleLeading),
             editableTitle.centerYAnchor.constraint(equalTo: centerYAnchor),
 
             // Profile icon (at trailing edge, shown when not hovered + has profile)
@@ -246,6 +266,7 @@ final class WorkspaceRowView: BaseView {
 
     func configure(workspaceName: String,
                    workspaceColor: NSColor,
+                   workspaceIcon: CustomIcon?,
                    showDelete: Bool,
                    canDelete: Bool,
                    hasProfile: Bool,
@@ -260,7 +281,7 @@ final class WorkspaceRowView: BaseView {
             editableTitle.text = workspaceName
         }
 
-        colorSquare.layer?.backgroundColor = workspaceColor.cgColor
+        configureIcon(workspaceIcon, fallbackColor: workspaceColor)
         deleteButton.isEnabled = canDelete
         deleteButton.toolTip = canDelete ? nil : "Cannot delete the last workspace"
 
@@ -268,6 +289,25 @@ final class WorkspaceRowView: BaseView {
         self.onDelete = onDelete
         self.onProfile = onProfile
         updateVisualState()
+    }
+
+    private func configureIcon(_ customIcon: CustomIcon?, fallbackColor: NSColor) {
+        if case .emoji(let emoji) = customIcon {
+            iconView.emoji = emoji
+            iconView.isHidden = false
+            colorSquare.isHidden = true
+            iconWidthConstraint?.constant = style.colorSquareSize + 20
+            iconHeightConstraint?.constant = style.colorSquareSize + 12
+        } else {
+            iconView.emoji = ""
+            iconView.isHidden = true
+            colorSquare.isHidden = false
+            iconWidthConstraint?.constant = style.colorSquareSize
+            iconHeightConstraint?.constant = style.colorSquareSize
+            colorSquare.layer?.backgroundColor = fallbackColor.cgColor
+            colorSquare.layer?.borderWidth = style.colorSquareBorderWidth
+            colorSquare.layer?.borderColor = style.colorSquareBorderColor.cgColor
+        }
     }
 
     var isInlineRenaming: Bool {

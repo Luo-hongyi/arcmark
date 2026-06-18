@@ -51,6 +51,7 @@ final class WorkspaceSwitcherView: NSView {
         let id: UUID
         let name: String
         let colorId: WorkspaceColorId
+        let customIcon: CustomIcon?
     }
 
     private let scrollView = NSScrollView()
@@ -200,6 +201,7 @@ final class WorkspaceSwitcherView: NSView {
                 workspaceId: workspace.id,
                 name: workspace.name,
                 colorId: workspace.colorId,
+                customIcon: workspace.customIcon,
                 style: style
             )
             button.translatesAutoresizingMaskIntoConstraints = false
@@ -505,8 +507,11 @@ private final class SettingsButton: BaseControl {
 private final class WorkspaceButton: BaseControl {
     private let workspaceId: UUID
     private let circleView = NSView()
+    private let iconView = EmojiIconView()
     private let titleLabel = NSTextField(string: "")
     private let style: WorkspaceSwitcherView.Style
+    private var iconWidthConstraint: NSLayoutConstraint?
+    private var iconHeightConstraint: NSLayoutConstraint?
 
     // Inline editing state
     private var isEditingTitle = false
@@ -531,7 +536,7 @@ private final class WorkspaceButton: BaseControl {
     var onTap: ((UUID) -> Void)?
     var onRightClick: ((UUID, NSPoint) -> Void)?
 
-    init(workspaceId: UUID, name: String, colorId: WorkspaceColorId, style: WorkspaceSwitcherView.Style) {
+    init(workspaceId: UUID, name: String, colorId: WorkspaceColorId, customIcon: CustomIcon?, style: WorkspaceSwitcherView.Style) {
         self.workspaceId = workspaceId
         self.style = style
         super.init(frame: .zero)
@@ -547,6 +552,12 @@ private final class WorkspaceButton: BaseControl {
         circleView.layer?.borderWidth = style.circleBorderWidth
         circleView.layer?.borderColor = style.circleBorderColor.withAlphaComponent(style.circleBorderOpacity).cgColor
 
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.pointSize = style.circleSize
+        iconView.isHidden = true
+        iconView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        iconView.setContentHuggingPriority(.required, for: .horizontal)
+
         // Setup title
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.lineBreakMode = .byTruncatingTail
@@ -559,7 +570,13 @@ private final class WorkspaceButton: BaseControl {
         titleLabel.font = NSFont.systemFont(ofSize: style.textSize, weight: style.textWeight)
 
         addSubview(circleView)
+        addSubview(iconView)
         addSubview(titleLabel)
+
+        let iconWidthConstraint = iconView.widthAnchor.constraint(equalToConstant: style.circleSize)
+        let iconHeightConstraint = iconView.heightAnchor.constraint(equalToConstant: style.circleSize)
+        self.iconWidthConstraint = iconWidthConstraint
+        self.iconHeightConstraint = iconHeightConstraint
 
         NSLayoutConstraint.activate([
             circleView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: style.buttonHorizontalPadding),
@@ -567,12 +584,37 @@ private final class WorkspaceButton: BaseControl {
             circleView.widthAnchor.constraint(equalToConstant: style.circleSize),
             circleView.heightAnchor.constraint(equalToConstant: style.circleSize),
 
-            titleLabel.leadingAnchor.constraint(equalTo: circleView.trailingAnchor, constant: style.circleTextGap),
+            iconView.centerXAnchor.constraint(equalTo: circleView.centerXAnchor),
+            iconView.centerYAnchor.constraint(equalTo: circleView.centerYAnchor),
+            iconWidthConstraint,
+            iconHeightConstraint,
+
+            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: style.circleTextGap),
             titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -style.buttonHorizontalPadding),
             titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
 
+        configureIcon(customIcon, fallbackColor: colorId.color)
         updateAppearance()
+    }
+
+    private func configureIcon(_ customIcon: CustomIcon?, fallbackColor: NSColor) {
+        if case .emoji(let emoji) = customIcon {
+            iconView.emoji = emoji
+            iconView.isHidden = false
+            circleView.isHidden = true
+            iconWidthConstraint?.constant = style.circleSize + 18
+            iconHeightConstraint?.constant = style.circleSize + 12
+        } else {
+            iconView.emoji = ""
+            iconView.isHidden = true
+            circleView.isHidden = false
+            iconWidthConstraint?.constant = style.circleSize
+            iconHeightConstraint?.constant = style.circleSize
+            circleView.layer?.backgroundColor = fallbackColor.cgColor
+            circleView.layer?.borderWidth = style.circleBorderWidth
+            circleView.layer?.borderColor = style.circleBorderColor.withAlphaComponent(style.circleBorderOpacity).cgColor
+        }
     }
 
     required init?(coder: NSCoder) {

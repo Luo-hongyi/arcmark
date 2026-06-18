@@ -29,6 +29,7 @@ final class WorkspaceCollectionViewItem: NSCollectionViewItem {
         rowView?.configure(
             workspaceName: workspace.name,
             workspaceColor: workspace.colorId.color,
+            workspaceIcon: workspace.customIcon,
             showDelete: true,
             canDelete: canDelete,
             hasProfile: {

@@ -71,6 +71,7 @@ final class ChromeImportService: Sendable {
                 let workspace = ImportWorkspace(
                     name: "Imported Bookmarks",
                     colorId: .ember,
+                    customIcon: nil,
                     nodes: nodes
                 )
 

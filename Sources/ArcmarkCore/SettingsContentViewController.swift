@@ -1067,13 +1067,15 @@ final class SettingsContentViewController: NSViewController {
     private func applyChromeImport(_ result: ChromeImportResult) {
         guard let appModel = appModel else { return }
 
-        // Create the workspace (this internally selects it for node insertion)
-        _ = appModel.createWorkspace(name: result.workspace.name, colorId: result.workspace.colorId)
-
-        // Add all nodes to the new workspace
-        for node in result.workspace.nodes {
-            addNodeToWorkspace(node, parentId: nil, appModel: appModel)
-        }
+        // Build the workspace in one shot with its full node tree instead of
+        // createWorkspace() + addNodeToWorkspace(). The old loop depended on
+        // createWorkspace implicitly selecting the new workspace, and addNodeToWorkspace
+        // had no case for .note/.separator nodes (they were silently dropped).
+        _ = appModel.createWorkspace(
+            name: result.workspace.name,
+            colorId: result.workspace.colorId,
+            items: result.workspace.nodes
+        )
 
         // Don't call selectWorkspace — it sets isSettingsSelected=false and navigates away.
         // The new workspace is already selected; when the user leaves settings they'll see it.
@@ -1165,23 +1167,6 @@ final class SettingsContentViewController: NSViewController {
 
         // Reload the workspace list to reflect the imported workspaces
         reloadWorkspaces()
-    }
-
-    private func addNodeToWorkspace(_ node: Node, parentId: UUID?, appModel: AppModel) {
-        switch node {
-        case .link(let link):
-            appModel.addLink(urlString: link.url, title: link.title, parentId: parentId)
-        case .note:
-            break
-        case .folder(let folder):
-            let folderId = appModel.addFolder(name: folder.name, parentId: parentId, isExpanded: false)
-            // Recursively add children
-            for child in folder.children {
-                addNodeToWorkspace(child, parentId: folderId, appModel: appModel)
-            }
-        case .separator:
-            break
-        }
     }
 
     private func showImportStatus(_ message: String, isError: Bool) {

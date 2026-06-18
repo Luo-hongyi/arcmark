@@ -132,6 +132,32 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(model.workspaces[3].name, "Third")
     }
 
+    func testCreateWorkspaceWithInitialItemsPersistsTree() {
+        // Regression coverage for the old fragile import flow, which relied on
+        // createWorkspace() implicitly selecting the new workspace and then calling
+        // addNodeToWorkspace() in a loop. createWorkspace now takes `items:` and the
+        // Chrome import path builds the workspace in one shot. This test pins that
+        // behavior: folders, links, notes, and separators all survive the round trip.
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let link = Link(id: UUID(), title: "Arc Link", url: "https://arc.net", faviconPath: nil)
+        let nestedFolder = Folder(id: UUID(), name: "Nested", children: [.link(link)], isExpanded: false)
+        let note = Note(id: UUID(), title: "Note", customIcon: nil)
+        let separator = Separator(id: UUID())
+
+        let items: [Node] = [.folder(nestedFolder), .note(note), .separator(separator)]
+        let workspaceId = model.createWorkspace(name: "Arc Space", colorId: .ocean, items: items)
+
+        XCTAssertEqual(model.currentWorkspace.id, workspaceId)
+        XCTAssertEqual(model.currentWorkspace.items, items)
+
+        let reloaded = store.load()
+        XCTAssertEqual(reloaded.workspaces.count, 2)
+        XCTAssertEqual(reloaded.workspaces[1].items, items)
+    }
+
     func testReplaceAllWorkspacesOverwritesExistingDataAndDoesNotPersistSettingsSelection() {
         let store = makeStore()
         store.save(DataStore.defaultState())

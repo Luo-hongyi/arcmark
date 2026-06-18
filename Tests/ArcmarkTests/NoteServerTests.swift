@@ -66,7 +66,9 @@ final class NoteServerTests: XCTestCase {
         XCTAssertEqual(status, 200)
         let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
         XCTAssertEqual(json?["title"] as? String, "Server Test")
-        XCTAssertTrue((json?["content"] as? String ?? "").contains("# Untitled"))
+        // New notes are created with empty content; the editor renders a "Start
+        // writing…" placeholder via CSS rather than storing starter markdown.
+        XCTAssertEqual(json?["content"] as? String, "")
     }
 
     func testGetReturns404WhenNoteDeleted() async throws {

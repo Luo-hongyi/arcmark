@@ -95,9 +95,15 @@ final class AppModel {
     }
 
     @discardableResult
-    func createWorkspace(name: String, colorId: WorkspaceColorId) -> UUID {
+    func createWorkspace(name: String, colorId: WorkspaceColorId, items: [Node] = []) -> UUID {
         guard guardCanWriteSharedData() else { return currentWorkspace.id }
-        let workspace = Workspace(id: UUID(), name: name, colorId: colorId, items: [])
+        // Pass `items` directly so callers that already have a fully-built node tree
+        // (e.g. import flows) don't have to rely on the implicit "createWorkspace
+        // selects the new workspace, then addNode/addLink mutate it" dance. That
+        // pattern silently dropped nodes when selection state was off and made each
+        // insertion go through a full recursive tree mutation. Building the workspace
+        // in one shot is both safer and faster.
+        let workspace = Workspace(id: UUID(), name: name, colorId: colorId, items: items)
         state.workspaces.append(workspace)
         state.selectedWorkspaceId = workspace.id
         UserDefaults.standard.set(workspace.id.uuidString, forKey: UserDefaultsKeys.lastSelectedWorkspaceId)

@@ -131,7 +131,11 @@ final class ScheduledLinksAccordionView: NSView {
 
     // MARK: - Public API
 
-    func update(entries: [ScheduledLinkEntry]) {
+    /// Accent color used for first-letter placeholder rows (no favicon yet).
+    private var accentColor: WorkspaceColorId = .defaultColor()
+
+    func update(entries: [ScheduledLinkEntry], accentColor: WorkspaceColorId) {
+        self.accentColor = accentColor
         entryCount = entries.count
         isHidden = entries.isEmpty
         if entries.isEmpty {
@@ -174,7 +178,7 @@ final class ScheduledLinksAccordionView: NSView {
         for entry in entries {
             let row = ScheduledLinkRowView()
             row.translatesAutoresizingMaskIntoConstraints = false
-            row.configure(entry: entry)
+            row.configure(entry: entry, accentColor: accentColor)
             row.onSelected = { [weak self] id in
                 self?.onRowSelected?(id)
             }

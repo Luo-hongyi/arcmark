@@ -464,11 +464,11 @@ final class MainViewController: NSViewController {
         } else {
             showWorkspaceContent()
             applyWorkspaceStyling()
-            pinnedTabsView.update(pinnedLinks: model.currentWorkspace.pinnedLinks)
+            pinnedTabsView.update(pinnedLinks: model.currentWorkspace.pinnedLinks, accentColor: model.currentWorkspace.colorId)
             if searchCoordinator.isSearchActive {
                 scheduledLinksAccordion.isHidden = true
             } else {
-                scheduledLinksAccordion.update(entries: model.scheduledLinks(in: model.currentWorkspace.id))
+                scheduledLinksAccordion.update(entries: model.scheduledLinks(in: model.currentWorkspace.id), accentColor: model.currentWorkspace.colorId)
             }
             let workspaceItems = model.currentWorkspace.items
             let visibleItems = searchCoordinator.isSearchActive
@@ -1318,8 +1318,8 @@ extension MainViewController: SwipeGestureServiceDelegate {
 
         // Switch to the adjacent workspace and update views without animation
         model.selectWorkspace(id: nextWorkspace.id)
-        pinnedTabsView.update(pinnedLinks: nextWorkspace.pinnedLinks)
-        scheduledLinksAccordion.update(entries: model.scheduledLinks(in: nextWorkspace.id))
+        pinnedTabsView.update(pinnedLinks: nextWorkspace.pinnedLinks, accentColor: nextWorkspace.colorId)
+        scheduledLinksAccordion.update(entries: model.scheduledLinks(in: nextWorkspace.id), accentColor: nextWorkspace.colorId)
         let filteredNodes = searchCoordinator.filter(nodes: ScheduledLinkFiltering.hideScheduled(nextWorkspace.items))
         nodeListViewController.reloadData(with: filteredNodes, forceExpand: false, animated: false)
 
@@ -1338,8 +1338,8 @@ extension MainViewController: SwipeGestureServiceDelegate {
         // Restore original workspace and content without animation
         model.selectWorkspace(id: currentId)
         let currentWorkspace = model.currentWorkspace
-        pinnedTabsView.update(pinnedLinks: currentWorkspace.pinnedLinks)
-        scheduledLinksAccordion.update(entries: model.scheduledLinks(in: currentWorkspace.id))
+        pinnedTabsView.update(pinnedLinks: currentWorkspace.pinnedLinks, accentColor: currentWorkspace.colorId)
+        scheduledLinksAccordion.update(entries: model.scheduledLinks(in: currentWorkspace.id), accentColor: currentWorkspace.colorId)
         let currentNodes = searchCoordinator.filter(nodes: ScheduledLinkFiltering.hideScheduled(currentWorkspace.items))
         nodeListViewController.reloadData(with: currentNodes, forceExpand: searchCoordinator.isSearchActive, animated: false)
         workspaceContentStack.layoutSubtreeIfNeeded()

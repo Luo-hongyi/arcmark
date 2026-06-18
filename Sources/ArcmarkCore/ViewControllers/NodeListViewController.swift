@@ -558,6 +558,23 @@ extension NodeListViewController {
         image.isTemplate = false
         return image
     }
+
+    /// Returns a themed first-letter placeholder for a link's URL, falling back to the
+    /// generic `globe` SF Symbol when no clean initial can be derived (e.g. IPs, localhost).
+    static func placeholderOrGlobe(for urlString: String,
+                                   accentColor: WorkspaceColorId,
+                                   size: CGFloat) -> NSImage? {
+        if let placeholder = PlaceholderIconGenerator.image(for: urlString,
+                                                            accentColor: accentColor,
+                                                            size: size) {
+            return placeholder
+        }
+        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        let globe = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config)
+        globe?.isTemplate = true
+        return globe
+    }
 }
 
 // MARK: - NSCollectionViewDataSource
@@ -613,10 +630,9 @@ extension NodeListViewController: NSCollectionViewDataSource {
                         image.isTemplate = false
                         iconToUse = image
                     } else {
-                        let globeConfig = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
-                        let placeholder = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?.withSymbolConfiguration(globeConfig)
-                        placeholder?.isTemplate = true
-                        iconToUse = placeholder
+                        iconToUse = Self.placeholderOrGlobe(for: link.url,
+                                                            accentColor: workspaceColor,
+                                                            size: listMetrics.iconSize)
                     }
                 }
             } else if let path = link.faviconPath,
@@ -626,10 +642,9 @@ extension NodeListViewController: NSCollectionViewDataSource {
                 iconToUse = image
                 shouldFetch = false
             } else {
-                let globeIconConfig = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
-                let placeholder = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?.withSymbolConfiguration(globeIconConfig)
-                placeholder?.isTemplate = true
-                iconToUse = placeholder
+                iconToUse = Self.placeholderOrGlobe(for: link.url,
+                                                    accentColor: workspaceColor,
+                                                    size: listMetrics.iconSize)
             }
 
             nodeItem.configure(

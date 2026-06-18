@@ -73,11 +73,11 @@ final class ScheduledLinkRowView: BaseControl {
         ])
     }
 
-    func configure(entry: ScheduledLinkEntry) {
+    func configure(entry: ScheduledLinkEntry, accentColor: WorkspaceColorId) {
         linkId = entry.link.id
         titleField.stringValue = entry.link.title
         dateField.stringValue = Self.formattedFireDate(entry.fireAt)
-        let icon = Self.faviconImage(for: entry.link, size: metrics.iconSize)
+        let icon = Self.faviconImage(for: entry.link, size: metrics.iconSize, accentColor: accentColor)
         iconView.image = icon
         if let icon, icon.isTemplate {
             iconView.contentTintColor = metrics.iconTintColor
@@ -120,7 +120,7 @@ final class ScheduledLinkRowView: BaseControl {
 
     // MARK: - Helpers
 
-    private static func faviconImage(for link: Link, size: CGFloat) -> NSImage? {
+    private static func faviconImage(for link: Link, size: CGFloat, accentColor: WorkspaceColorId) -> NSImage? {
         if let customIcon = link.customIcon {
             switch customIcon {
             case .emoji(let emoji):
@@ -137,7 +137,7 @@ final class ScheduledLinkRowView: BaseControl {
                     image.isTemplate = false
                     return image
                 }
-                return globeImage(size: size)
+                return placeholderOrGlobe(for: link.url, accentColor: accentColor, size: size)
             }
         }
         if let path = link.faviconPath,
@@ -145,6 +145,17 @@ final class ScheduledLinkRowView: BaseControl {
            let image = NSImage(contentsOfFile: path) {
             image.isTemplate = false
             return image
+        }
+        return placeholderOrGlobe(for: link.url, accentColor: accentColor, size: size)
+    }
+
+    private static func placeholderOrGlobe(for urlString: String,
+                                           accentColor: WorkspaceColorId,
+                                           size: CGFloat) -> NSImage? {
+        if let placeholder = PlaceholderIconGenerator.image(for: urlString,
+                                                            accentColor: accentColor,
+                                                            size: size) {
+            return placeholder
         }
         return globeImage(size: size)
     }

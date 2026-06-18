@@ -40,7 +40,7 @@ final class PinnedTabTileView: BaseControl {
         ])
     }
 
-    func configure(link: Link, iconsDirectory: URL?) {
+    func configure(link: Link, iconsDirectory: URL?, accentColor: WorkspaceColorId) {
         tooltipShowTask?.cancel()
         tooltipShowTask = nil
         linkId = link.id
@@ -67,13 +67,7 @@ final class PinnedTabTileView: BaseControl {
                     faviconView.image = image
                     faviconView.contentTintColor = nil
                 } else {
-                    let config = NSImage.SymbolConfiguration(pointSize: ThemeConstants.Sizing.iconLarge, weight: .semibold)
-                    let globe = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?
-                        .withSymbolConfiguration(config)
-                    globe?.isTemplate = true
-                    faviconView.image = globe
-                    faviconView.contentTintColor = ThemeConstants.Colors.darkGray
-                        .withAlphaComponent(ThemeConstants.Opacity.low)
+                    applyPlaceholderOrGlobe(for: link.url, accentColor: accentColor)
                 }
             }
         } else if let path = link.faviconPath,
@@ -83,14 +77,28 @@ final class PinnedTabTileView: BaseControl {
             faviconView.image = image
             faviconView.contentTintColor = nil
         } else {
-            let config = NSImage.SymbolConfiguration(pointSize: ThemeConstants.Sizing.iconLarge, weight: .semibold)
-            let globe = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?
-                .withSymbolConfiguration(config)
-            globe?.isTemplate = true
-            faviconView.image = globe
-            faviconView.contentTintColor = ThemeConstants.Colors.darkGray
-                .withAlphaComponent(ThemeConstants.Opacity.low)
+            applyPlaceholderOrGlobe(for: link.url, accentColor: accentColor)
         }
+    }
+
+    /// Renders a themed first-letter placeholder, or falls back to the `globe` SF Symbol
+    /// when no clean initial can be derived from the URL.
+    private func applyPlaceholderOrGlobe(for urlString: String, accentColor: WorkspaceColorId) {
+        let size = ThemeConstants.Sizing.iconLarge
+        if let placeholder = PlaceholderIconGenerator.image(for: urlString,
+                                                            accentColor: accentColor,
+                                                            size: size) {
+            faviconView.image = placeholder
+            faviconView.contentTintColor = nil
+            return
+        }
+        let config = NSImage.SymbolConfiguration(pointSize: size, weight: .semibold)
+        let globe = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config)
+        globe?.isTemplate = true
+        faviconView.image = globe
+        faviconView.contentTintColor = ThemeConstants.Colors.darkGray
+            .withAlphaComponent(ThemeConstants.Opacity.low)
     }
 
     // MARK: - State Overrides

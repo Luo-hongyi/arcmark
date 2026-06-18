@@ -21,7 +21,11 @@ final class PinnedTabsView: NSView {
         translatesAutoresizingMaskIntoConstraints = false
     }
 
-    func update(pinnedLinks: [Link]) {
+    /// Accent color used for first-letter placeholder tiles (no favicon yet).
+    private var accentColor: WorkspaceColorId = .defaultColor()
+
+    func update(pinnedLinks: [Link], accentColor: WorkspaceColorId) {
+        self.accentColor = accentColor
         currentLinks = pinnedLinks
         isHidden = pinnedLinks.isEmpty
 
@@ -45,7 +49,7 @@ final class PinnedTabsView: NSView {
 
         // Configure each tile
         for (index, link) in pinnedLinks.enumerated() {
-            tileViews[index].configure(link: link, iconsDirectory: nil)
+            tileViews[index].configure(link: link, iconsDirectory: nil, accentColor: accentColor)
             fetchFaviconIfNeeded(for: link)
         }
 

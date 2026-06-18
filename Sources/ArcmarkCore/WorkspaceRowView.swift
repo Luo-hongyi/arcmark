@@ -55,8 +55,6 @@ final class WorkspaceRowView: BaseView {
         var setProfileHeight: CGFloat
 
         static var `default`: Style {
-            let baseColorValue: CGFloat = 20.0 / 255.0
-
             return Style(
                 rowCornerRadius: ThemeConstants.CornerRadius.large,
                 handleSize: ThemeConstants.Sizing.iconMedium,
@@ -72,15 +70,15 @@ final class WorkspaceRowView: BaseView {
                 buttonsTrailing: ThemeConstants.Spacing.regular,
                 buttonGap: ThemeConstants.Spacing.small,
                 titleFont: ThemeConstants.Fonts.bodyRegular,
-                titleColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.high),
+                titleColor: ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.high),
                 setProfileFont: ThemeConstants.Fonts.systemFont(size: 11, weight: .medium),
-                handleTintColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.low),
-                colorSquareBorderColor: NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: ThemeConstants.Opacity.subtle),
-                deleteTintColor: NSColor.black.withAlphaComponent(0.5),
-                profileIconTintColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.low),
-                setProfileTextColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.medium),
-                setProfileBorderColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.subtle),
-                hoverBackgroundColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.extraSubtle),
+                handleTintColor: ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.low),
+                colorSquareBorderColor: ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.subtle),
+                deleteTintColor: ThemeConstants.Colors.darkGray.withAlphaComponent(0.5),
+                profileIconTintColor: ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.low),
+                setProfileTextColor: ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.medium),
+                setProfileBorderColor: ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.subtle),
+                hoverBackgroundColor: ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.extraSubtle),
                 handleIconName: "line.3.horizontal",
                 handleIconSize: ThemeConstants.Sizing.iconMedium,
                 handleIconWeight: .medium,

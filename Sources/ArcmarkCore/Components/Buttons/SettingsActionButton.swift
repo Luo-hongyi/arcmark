@@ -9,8 +9,8 @@ final class SettingsActionButton: NSButton {
         static let hoverBackgroundColor = ThemeConstants.Colors.darkGray
             .withAlphaComponent(ThemeConstants.Opacity.extraSubtle)
         static let textColor = ThemeConstants.Colors.darkGray
-        static let disabledBackgroundColor = NSColor(
-            calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.06)
+        static let disabledBackgroundColor = ThemeConstants.Colors.darkGray
+            .withAlphaComponent(ThemeConstants.Opacity.minimal)
         static let disabledTextColor = ThemeConstants.Colors.darkGray
             .withAlphaComponent(ThemeConstants.Opacity.medium)
         static let cornerRadius = ThemeConstants.CornerRadius.medium

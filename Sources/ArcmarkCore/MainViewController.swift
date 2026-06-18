@@ -658,8 +658,8 @@ final class MainViewController: NSViewController {
         color.setFill()
         path.fill()
 
-        // Add subtle border
-        let borderColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.20)
+        // Add subtle border (dynamic so it stays visible in dark mode)
+        let borderColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.low)
         borderColor.setStroke()
         path.lineWidth = 1.5
         path.stroke()

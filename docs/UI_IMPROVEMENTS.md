@@ -154,3 +154,23 @@
 - 修复（解析层）：`extractGroups` 按 group token 去重，仅取每个 group 首次出现。
 - 修复（apply 层）：`applyTabbitImport` 每次重置 Tabbit workspace 的 items + pinnedLinks（不保留旧），`browserProfiles` 保留，其它 workspace 不动。
 - 作者实测通过：folder 数与 Tabbit 当前 group 一致（待办任务/每天闻读/X平台浏览/GEO/Jobs/百度OCR），不累加。
+
+### 2026-06-18 — 任务 6 收敛 magic numbers ⏭ 跳过
+- 作者决定不做，跳过。
+
+---
+
+## 总结
+
+本分支（`codex/ui-improvements`）共处理 8 项：
+
+| # | 任务 | 状态 |
+|---|---|---|
+| 1 | 深色模式支持（动态色 + appearance 跟随） | ✅ 完成 |
+| 2 | Favicon 占位符 / 首字母圆形图标 | ✅ 完成 |
+| 计划外 | Appearance 浅色/深色手动切换 | ✅ 完成 |
+| 3 | 列表键盘导航 | ⏭ 跳过 |
+| 4 | 删除 Undo | ⏭ 跳过 |
+| 5 | 空搜索状态视图 | ⏭ 跳过 |
+| 计划外 | Tabbit import 累加问题修复 | ✅ 完成 |
+| 6 | 收敛 magic numbers | ⏭ 跳过 |

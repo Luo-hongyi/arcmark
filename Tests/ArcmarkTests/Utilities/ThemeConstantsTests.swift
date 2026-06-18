@@ -7,25 +7,54 @@ final class ThemeConstantsTests: XCTestCase {
     // MARK: - Color Tests
 
     func testColorsAreValid() {
-        // Verify colors have valid RGB values (0-1 range)
+        // Verify colors are non-nil dynamic color wrappers.
         XCTAssertNotNil(ThemeConstants.Colors.darkGray)
         XCTAssertNotNil(ThemeConstants.Colors.white)
         XCTAssertNotNil(ThemeConstants.Colors.settingsBackground)
+        XCTAssertNotNil(ThemeConstants.Colors.windowBackground)
+    }
+
+    /// Helper: resolves a dynamic `NSColor` under a given appearance and reads its RGBA.
+    ///
+    /// Dynamic NSColors can't be queried for components directly; we set the current
+    /// appearance and convert through the sRGB color space, then read RGBA.
+    private func rgba(_ color: NSColor, appearance: NSAppearance = NSAppearance(named: .aqua)!) -> (CGFloat, CGFloat, CGFloat, CGFloat) {
+        NSAppearance.current = appearance
+        defer { NSAppearance.current = nil }
+        let resolved = color.usingColorSpace(NSColorSpace.sRGB) ?? color
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        resolved.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return (r, g, b, a)
     }
 
     func testDarkGrayColor() {
-        let color = ThemeConstants.Colors.darkGray
-        var red: CGFloat = 0
-        var green: CGFloat = 0
-        var blue: CGFloat = 0
-        var alpha: CGFloat = 0
+        // Light appearance: darkGray resolves to a dark value (near-black).
+        let (r, g, b, a) = rgba(ThemeConstants.Colors.darkGray)
+        XCTAssertLessThan(r, 0.15, "light darkGray should be dark (near-black)")
+        XCTAssertEqual([r, g, b].max()!, [r, g, b].min()!, accuracy: 0.002, "darkGray is neutral (R=G=B)")
+        XCTAssertEqual(a, 1.0, accuracy: 0.001)
+    }
 
-        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+    func testDarkGrayColorDarkAppearance() {
+        // Dark appearance: darkGray resolves to a light value (near-white), proving the
+        // dynamic wrapper switches variants with the effective appearance.
+        let (r, g, b, a) = rgba(ThemeConstants.Colors.darkGray, appearance: NSAppearance(named: .darkAqua)!)
+        XCTAssertGreaterThan(r, 0.9, "dark darkGray should be light (near-white)")
+        XCTAssertEqual([r, g, b].max()!, [r, g, b].min()!, accuracy: 0.002, "darkGray is neutral (R=G=B)")
+        XCTAssertEqual(a, 1.0, accuracy: 0.001)
+    }
 
-        XCTAssertEqual(red, 0.078, accuracy: 0.001)
-        XCTAssertEqual(green, 0.078, accuracy: 0.001)
-        XCTAssertEqual(blue, 0.078, accuracy: 0.001)
-        XCTAssertEqual(alpha, 1.0, accuracy: 0.001)
+    func testDarkGrayColorSwitchesWithAppearance() {
+        // Core contract: the same constant resolves differently under light vs dark.
+        let lightR = rgba(ThemeConstants.Colors.darkGray).0
+        let darkR = rgba(ThemeConstants.Colors.darkGray, appearance: NSAppearance(named: .darkAqua)!).0
+        XCTAssertGreaterThan(darkR - lightR, 0.7, "darkGray must differ dramatically between appearances")
+    }
+
+    func testSettingsBackgroundDarkAppearance() {
+        let (r, _, _, _) = rgba(ThemeConstants.Colors.settingsBackground, appearance: NSAppearance(named: .darkAqua)!)
+        // Dark settings background should be near-black, not the light gray (#E5E7EB ≈ 0.9).
+        XCTAssertLessThan(r, 0.2)
     }
 
     // MARK: - Opacity Tests

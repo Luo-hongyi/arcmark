@@ -66,9 +66,29 @@ struct ListMetrics {
     let iconCornerRadius: CGFloat = 4
     let linkTitleFont: NSFont = NSFont.systemFont(ofSize: 14, weight: .regular)
     let folderTitleFont: NSFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
-    let titleColor: NSColor = NSColor.black.withAlphaComponent(0.8)
-    let hoverBackgroundColor: NSColor = NSColor.black.withAlphaComponent(0.1)
-    let selectedBackgroundColor: NSColor = NSColor.black.withAlphaComponent(0.2)
-    let deleteTintColor: NSColor = NSColor.black.withAlphaComponent(0.5)
-    let iconTintColor: NSColor = NSColor.black.withAlphaComponent(0.7)
+    // Foreground (title/icon) and state (hover/selected/delete) colors are dynamic:
+    // they resolve to black-derived values under the light appearance and white-derived
+    // values under the dark appearance. Because `ListMetrics` is reconstructed on each
+    // reload (and reload is triggered on `viewDidChangeEffectiveAppearance` from the
+    // containing view), these values stay in sync with the effective appearance.
+    let titleColor: NSColor = ThemeConstants.Appearance.dynamicColor(
+        light: NSColor.black.withAlphaComponent(0.8),
+        dark: NSColor.white.withAlphaComponent(0.85)
+    )
+    let hoverBackgroundColor: NSColor = ThemeConstants.Appearance.dynamicColor(
+        light: NSColor.black.withAlphaComponent(0.06),
+        dark: NSColor.white.withAlphaComponent(0.08)
+    )
+    let selectedBackgroundColor: NSColor = ThemeConstants.Appearance.dynamicColor(
+        light: NSColor.black.withAlphaComponent(0.12),
+        dark: NSColor.white.withAlphaComponent(0.15)
+    )
+    let deleteTintColor: NSColor = ThemeConstants.Appearance.dynamicColor(
+        light: NSColor.black.withAlphaComponent(0.5),
+        dark: NSColor.white.withAlphaComponent(0.6)
+    )
+    let iconTintColor: NSColor = ThemeConstants.Appearance.dynamicColor(
+        light: NSColor.black.withAlphaComponent(0.7),
+        dark: NSColor.white.withAlphaComponent(0.8)
+    )
 }

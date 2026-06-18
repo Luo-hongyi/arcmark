@@ -84,6 +84,14 @@ final class WorkspaceSwitcherView: NSView {
         }
     }
 
+    /// Re-applies dynamic colors after an effective-appearance change (light ↔ dark).
+    /// Triggers a rebuild so cached `cgColor` values on buttons/circles are re-resolved.
+    func refreshAppearance() {
+        applyStyle()
+        rebuildButtons()
+        updateSelection()
+    }
+
     var selectedWorkspaceId: UUID? {
         didSet {
             updateSelection()

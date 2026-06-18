@@ -53,17 +53,65 @@ struct ThemeConstants {
     // MARK: - Colors
 
     /// Standard color palette for the application.
+    ///
+    /// All colors here are *dynamic* (`NSColor(name:)`): they resolve to a light variant under
+    /// the `aqua` appearance and a dark variant under `darkAqua`. Call sites are unchanged —
+    /// AppKit re-resolves them automatically when the effective appearance changes, and the
+    /// base classes (`BaseView` / `BaseControl`) plus the list reload path re-apply them.
     struct Colors {
-        /// Primary dark color used for text, icons, and UI elements.
-        /// Hex: #141414 | RGB: (20, 20, 20)
-        static let darkGray = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0)
+        /// Primary foreground color used for text, icons, and UI elements.
+        /// Light: Hex #141414 | RGB (20, 20, 20)
+        /// Dark:  Hex #F5F5F5 | RGB (245, 245, 245)
+        static let darkGray = Appearance.dynamicColor(
+            light: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0),
+            dark: NSColor(calibratedRed: 0.961, green: 0.961, blue: 0.961, alpha: 1.0)
+        )
 
-        /// Pure white used for light text and icons on dark backgrounds.
-        static let white = NSColor.white
+        /// Contrast color used for light text/icons on dark backgrounds.
+        /// Resolves to dark gray (#141414) under the dark appearance so it stays a contrast color.
+        static let white = Appearance.dynamicColor(
+            light: NSColor.white,
+            dark: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0)
+        )
 
-        /// Light gray background used in settings and preferences views.
-        /// Hex: #E5E7EB | RGB: (229, 231, 235)
-        static let settingsBackground = NSColor(calibratedRed: 0.898, green: 0.906, blue: 0.922, alpha: 1.0)
+        /// App background used in settings and preferences views, and the current default
+        /// workspace background.
+        /// Light: Hex #E5E7EB | RGB (229, 231, 235)
+        /// Dark:  Hex #1E1E1E | RGB (30, 30, 30)
+        static let settingsBackground = Appearance.dynamicColor(
+            light: NSColor(calibratedRed: 0.898, green: 0.906, blue: 0.922, alpha: 1.0),
+            dark: NSColor(calibratedRed: 0.118, green: 0.118, blue: 0.118, alpha: 1.0)
+        )
+
+        /// Deepest window background (used for dark-mode blending of workspace accent colors).
+        /// Light: identical to `settingsBackground`.
+        /// Dark:  Hex #161616 | RGB (22, 22, 22)
+        static let windowBackground = Appearance.dynamicColor(
+            light: NSColor(calibratedRed: 0.898, green: 0.906, blue: 0.922, alpha: 1.0),
+            dark: NSColor(calibratedRed: 0.086, green: 0.086, blue: 0.086, alpha: 1.0)
+        )
+    }
+
+    /// Appearance helpers for light/dark dynamic colors.
+    enum Appearance {
+        /// Returns `true` when the given (or current) appearance resolves to a dark variant.
+        static func isDark(_ appearance: NSAppearance? = nil) -> Bool {
+            let resolved = appearance ?? NSApp?.effectiveAppearance ?? NSAppearance(named: .aqua)
+            return resolved?.bestMatch(from: [
+                .darkAqua,
+                .vibrantDark,
+                .accessibilityHighContrastDarkAqua,
+                .accessibilityHighContrastVibrantDark
+            ]) != nil
+        }
+
+        /// Creates a dynamic `NSColor` that switches between `light` and `dark` based on the
+        /// effective appearance at draw time. Re-resolves automatically on appearance change.
+        static func dynamicColor(light: NSColor, dark: NSColor) -> NSColor {
+            NSColor(name: nil) { appearance in
+                isDark(appearance) ? dark : light
+            }
+        }
     }
 
     // MARK: - Opacity

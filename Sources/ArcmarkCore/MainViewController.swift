@@ -42,6 +42,7 @@ final class MainViewController: NSViewController {
     private var isSwipeAnimating = false
     private var suppressNodeAnimations = false          // Suppresses collection view animations during swipe transitions
     private var swipeColorAnimationFromColor: NSColor?  // Set before workspace switch to trigger animated color transition
+    private var appearanceObservation: NSKeyValueObservation?
 
     init(model: AppModel) {
         self.model = model
@@ -62,6 +63,23 @@ final class MainViewController: NSViewController {
         self.view = view
     }
 
+    /// Re-applies dynamic colors when the system appearance changes (light ↔ dark).
+    ///
+    /// Many views cache resolved colors as `CGColor` on their layer (hover/selected backgrounds,
+    /// the window background, etc.). NSColor dynamic wrappers re-resolve at draw time for
+    /// text/layer-backed content, but cached `cgColor` writes do not refresh on their own.
+    /// A `reloadData()` walks every cell's `configure(...)` path and re-writes those values,
+    /// and `applyWorkspaceStyling()` / the workspace switcher re-apply their backgrounds.
+    ///
+    /// `NSViewController` has no `viewDidChangeEffectiveAppearance()` override point (that's
+    /// `NSView`), so we observe the global effective-appearance did-change notification.
+    @objc private func handleEffectiveAppearanceChanged() {
+        // Coalesce with any pending reload to avoid duplicate work.
+        if isReloadScheduled { return }
+        reloadData()
+        workspaceSwitcher.refreshAppearance()
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupChildViewControllers()
@@ -78,6 +96,13 @@ final class MainViewController: NSViewController {
             name: .init("UpdateLinkFavicon"),
             object: nil
         )
+
+        // Re-apply dynamic colors when the system appearance changes (light ↔ dark).
+        appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            MainActor.assumeIsolated {
+                self?.handleEffectiveAppearanceChanged()
+            }
+        }
     }
 
     // MARK: - Setup

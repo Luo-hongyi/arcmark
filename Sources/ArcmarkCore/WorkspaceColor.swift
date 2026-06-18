@@ -43,7 +43,18 @@ enum WorkspaceColorId: String, Codable {
         if self == .settingsBackground {
             return color
         }
-        return color.withAlphaComponent(0.92)
+        // Light: a soft tint at 0.92 alpha over the window.
+        // Dark:  blend 18% of the accent into the deep window background, so dark mode shows
+        //        "deep base + a hint of accent" rather than a too-bright pastel.
+        return NSColor(name: nil) { appearance in
+            let isDark = ThemeConstants.Appearance.isDark(appearance)
+            if isDark {
+                return ThemeConstants.Colors.windowBackground
+                    .blended(withFraction: 0.18, of: self.color) ?? self.color.withAlphaComponent(0.18)
+            } else {
+                return self.color.withAlphaComponent(0.92)
+            }
+        }
     }
 
     var textColor: NSColor {

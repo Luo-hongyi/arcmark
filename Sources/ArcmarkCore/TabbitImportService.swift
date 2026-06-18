@@ -101,10 +101,14 @@ final class TabbitImportService: Sendable {
                     ))
                 }
 
+                // Tabbit's app icon is an orange square, so use a matching orange-square
+                // emoji plus the closest orange workspace color (.ruby / Apricot) instead of
+                // the default blue dot. This makes the imported workspace recognizable at a
+                // glance in the top switcher.
                 let workspace = ImportWorkspace(
                     name: "Tabbit",
-                    colorId: .ocean,
-                    customIcon: nil,
+                    colorId: .ruby,
+                    customIcon: .emoji("🟧"),
                     nodes: nodes
                 )
 

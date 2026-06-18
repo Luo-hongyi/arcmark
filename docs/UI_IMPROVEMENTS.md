@@ -123,22 +123,18 @@
 - 作者实测：浅色/深色切换实时跟随，窗口背景、列表 hover/selected、Settings 文字、Manage Workspaces 行、顶部滚动渐变均正常。
 
 ### 2026-06-18 — 任务 2 Favicon 占位符 ✅
-- 新增 `PlaceholderIconGenerator`：提取域名首字母（去 `www.`、大写、仅字母；IP/localhost/非 ASCII 退回 nil），渲染彩色圆盘 + 白字；圆盘色用 `WorkspaceColorId.backgroundColor`（动态，深色跟随）。
+- 新增 `PlaceholderIconGenerator`：提取域名首字母（去 `www.`、大写、仅字母；IP/localhost/非 ASCII 退回 nil），渲染彩色圆盘 + 字母。
 - 三处调用点（`NodeListViewController` / `PinnedTabTileView` / `ScheduledLinkRowView`）改为先占位符、不行再 globe 兜底。
 - accentColor 从 `MainViewController` 经 `PinnedTabsView.update(accentColor:)` / `ScheduledLinksAccordionView.update(accentColor:)` 透传到各 row。
+- 圆盘用实心 `accentColor.color`（饱和马卡龙色），字母用深色（8 色 luma 0.55–0.86，白字对比 1–2:1 不可见，深字对比 12–18:1）。
 - 新增 11 个单元测试，覆盖首字母提取与图像渲染（含 8 色）。`swift test` 全通过。
 - 作者实测通过。
 
-### 2026-06-18 — 计划外：浅色/深色手动切换（Settings）
-- 背景：任务 1 默认"跟随系统"，作者希望改为用户手动选择，默认浅色，无"跟随系统"选项。
-- 状态：待实施（见下方独立方案）。
-
-### 2026-06-18 — 任务 1 深色模式支持 ✅
-- `ThemeConstants.Colors` 的 `darkGray / white / settingsBackground` 改为 `NSColor(name:)` 动态色，新增 `windowBackground` 与 `Appearance` helper（`isDark` / `dynamicColor`）。
-- `ListMetrics` 的 hover/selected/title/delete/icon tint 改为浅色 black-derived、深色 white-derived。
-- `WorkspaceColorId.backgroundColor`：`.settingsBackground` 分支委托给动态的 `ThemeConstants.Colors.settingsBackground`；其余 8 色深色下做 18% accent 混合。
-- `MainViewController` 监听 `NSApp.effectiveAppearance`，切换时重设 `window.backgroundColor` 并 `reloadData()` + `workspaceSwitcher.refreshAppearance()`。
-- `WorkspaceSwitcherView.refreshAppearance()` 新增（含 `updateShadows()`），shadow 渐变改用动态的 `backgroundColor`。
-- 清理所有残留硬编码 `#141414`：`SettingsContentViewController`（section/regular text + popup）、`WorkspaceRowView.Style`（7 处）、`SettingsActionButton.disabledBackgroundColor`、`MainViewController.createColorPreviewImage`。
-- 测试：`ThemeConstantsTests` 改为在显式 appearance 下解析动态色并断言浅/深切换；新增 `testDarkGrayColorSwitchesWithAppearance`。`swift test` 全通过。
-- 作者实测：浅色/深色切换实时跟随，窗口背景、列表 hover/selected、Settings 文字、Manage Workspaces 行、顶部滚动渐变均正常。
+### 2026-06-18 — 计划外：浅色/深色手动切换 ✅
+- 作者要求：在 Window Settings 加手动外观切换，默认浅色，无"跟随系统"。
+- 新增 `AppearancePreference` 枚举（light/dark）持久化于 UserDefaults（默认 `.light`），带 `.appearancePreferenceChanged` 通知。
+- `AppDelegate` 启动时 `window.appearance = AppearancePreference.current.nsAppearance` 强制外观，并在通知变化时重设；`register(defaults:)` 注册默认。
+- `MainViewController` 改为监听 `.appearancePreferenceChanged`（替代任务1 的 `NSApp.effectiveAppearance` KVO）触发刷新。
+- `SettingsContentViewController` 加 "Dark Mode" CustomToggle，位于 Attach Sidebar / Position selector 下方；用动态约束避免 selector 隐藏时产生空隙。
+- 关键 bug 修复：`isDark()` 无条件优先读 `AppearancePreference`。根因——当 `NSAppearance.current` 未设置（reload 回调等非 draw 上下文），AppKit 给 `NSColor(name:)` provider 传入的 appearance 会被错误解析成 darkAqua，导致浅色模式背景变深。改为以用户偏好为唯一真相后，resolve 在任何上下文都确定且正确。
+- 作者实测通过：浅色窗口背景正确、toggle 位置正确、重启记住选择、切换系统外观不受影响。

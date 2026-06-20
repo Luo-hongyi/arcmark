@@ -2,6 +2,13 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+## Agent Workflow
+
+These conventions override default assumptions about how an agent should operate in this repo.
+
+- **Do not push automatically.** Commit locally as you work; only push to the remote when the user explicitly asks. Never chain `git push` onto a `git commit`. A one-time "push first" instruction means "establish a remote baseline before editing," not "push after every change."
+- **Rule out stale state before reading code.** When the user reports "X still shows the old value after your change," first check whether the change actually reached the running app or the persisted data — rebuild/relaunch, or re-run the operation that produces the data (e.g. an importer). Source edits do not retroactively mutate already-saved records. Only start hunting for a code bug once you've confirmed the change is actually live.
+
 ## Project Overview
 
 Arcmark is a macOS bookmark management application built with Swift and AppKit. It provides a workspace-based organization system for links and folders with features like drag-and-drop, inline editing, and automatic favicon/title fetching.
@@ -261,6 +268,62 @@ WorkspaceColorId enum defines 8 color themes (Blush, Apricot, Butter, Leaf, Mint
 - Tests verify both state mutation and JSON round-trip encoding
 - Base class tests exist but are currently skipped due to Swift 6 concurrency requirements with XCTest
 - ThemeConstants has comprehensive unit tests validating all design values
+
+## Development Rules (Lessons Learned)
+
+These rules come from concrete mistakes made on this codebase. Follow them
+to avoid repeating them.
+
+### 1. Audit all call sites, not just the source
+When changing a "single source of truth" (e.g. a `ThemeConstants` color, a
+shared constant), `grep` for **every** consumer before declaring the change
+done. Many call sites bypass the source with hard-coded values
+(`NSColor.black.withAlphaComponent`, literal RGB like `0.078`). Build a
+checklist of consumers and verify each one actually flows through the
+source you changed.
+
+### 2. For global changes, scan the whole codebase first
+Before a sweeping change (dark mode, design-system migration), grep the
+entire `Sources/` tree for all hard-coded values of that kind (colors,
+font sizes, spacing) and replace them in one pass. Do not ship a
+"done" change that only covers the obvious files.
+
+### 3. Verify dynamic-color behavior in non-draw contexts
+`NSColor(name:)` providers receive whatever appearance AppKit resolves at
+call time. When read off the main draw path (e.g. `color.cgColor` inside a
+reload callback), `NSAppearance.current` may be stale/nil and AppKit can
+pass a misleading appearance. If appearance is user-controlled, make the
+dark/light decision read the user's stored preference directly rather than
+trusting the provider argument. Validate with a small test script first.
+
+### 4. Use data, not convention, for color contrast
+Before deciding text/icon color on a background, compute the background's
+relative luminance (WCAG formula) and the contrast ratio. Enumerate every
+color variant (e.g. all 8 workspace accents). Never assume "white text is
+the convention" — verify the ratio is >= 4.5:1.
+
+### 5. Hidden views still occupy Auto Layout space
+A `view.isHidden = true` NSView keeps its constraints and intrinsic size.
+For conditionally-shown views, either use `NSStackView` (auto-collapses) or
+maintain mutually-exclusive constraints like the existing
+`separator1ToToggleConstraint` / `separator1ToSelectorConstraint` pattern.
+
+### 6. Diagnose before fixing; prefer the user's simple solution
+When behavior is wrong, add diagnostics first (`NSLog` for GUI apps —
+`print`/stdout is often swallowed; or write to `UserDefaults`) to confirm
+the actual symptom and locate the layer at fault. Do not guess from code
+reading and change code blindly. When the user proposes a simple fix,
+prefer it — do not over-engineer alternatives they did not ask for.
+
+### 7. Treat the plan as a checklist
+After implementing, walk the approved plan line by line and confirm each
+item landed in code. The most embarrassing bugs here came from stating a
+change in the plan and then omitting it during implementation.
+
+### 8. Mind brace balance when editing
+When deleting a method or block with Edit, re-read the surrounding lines
+to confirm brace pairing before building — an orphan `}` causes a wasted
+compile cycle.
 
 ## Refactoring History
 
